@@ -13,7 +13,11 @@ class CallHistoryScreen extends StatefulWidget {
 class _CallHistoryScreenState extends State<CallHistoryScreen> {
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   List<CallInfo> _callList = [];
+  List<CallInfo> _filteredCallList = [];
   String _errorMessage = ''; // Add an error message field
+  String _searchQuery = ""; // Add search query state
+  String _selectedFilter = "all"; // "all", "incoming", "outgoing", "missed"
+  bool _isLoading = true; // Add loading state
 
   @override
   void initState() {
@@ -26,7 +30,9 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
     if (user == null) {
       setState(() {
         _callList = [];
+        _filteredCallList = [];
         _errorMessage = 'User is not logged in'; // Set error message
+        _isLoading = false; // Set loading state to false
       });
       return;
     }
@@ -72,19 +78,25 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
 
         setState(() {
           _callList = fetchedCalls;
+          _filteredCallList = fetchedCalls;
           _errorMessage = ''; // Clear error message
+          _isLoading = false; // Set loading state to false
         });
       } else {
         setState(() {
           _callList = [];
+          _filteredCallList = [];
           _errorMessage = 'No call data found'; // Set error message
+          _isLoading = false; // Set loading state to false
         });
       }
     } catch (e) {
       debugPrint('Error fetching call data: $e');
       setState(() {
         _callList = [];
+        _filteredCallList = [];
         _errorMessage = 'Error fetching call data: $e'; // Set error message
+        _isLoading = false; // Set loading state to false
       });
     }
   }
@@ -122,9 +134,136 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
     }
   }
 
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+      _applyFilters();
+    });
+  }
+
+  void _applyFilters() {
+    final calls = _callList;
+    setState(() {
+      _filteredCallList = calls.where((call) {
+        if (_selectedFilter == "incoming") {
+          return call.type == CallType.incoming;
+        } else if (_selectedFilter == "outgoing") {
+          return call.type == CallType.outgoing;
+        } else if (_selectedFilter == "missed") {
+          return call.type == CallType.missed;
+        }
+        return true; // Default is "all"
+      }).where((call) {
+        if (_searchQuery.isEmpty) {
+          return true;
+        }
+        return call.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               call.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    });
+  }
+
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Filter Calls"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<String>(
+                value: "all",
+                groupValue: _selectedFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFilter = value!;
+                    _applyFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                title: Text("Show All"),
+              ),
+              RadioListTile<String>(
+                value: "incoming",
+                groupValue: _selectedFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFilter = value!;
+                    _applyFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                title: Text("Incoming Calls"),
+              ),
+              RadioListTile<String>(
+                value: "outgoing",
+                groupValue: _selectedFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFilter = value!;
+                    _applyFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                title: Text("Outgoing Calls"),
+              ),
+              RadioListTile<String>(
+                value: "missed",
+                groupValue: _selectedFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFilter = value!;
+                    _applyFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                title: Text("Missed Calls"),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.blue,
+        title: Text("Call History"),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search calls...',
+                      prefixIcon: Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.filter_list),
+                  onPressed: _showFilterDialog,
+                  tooltip: "Filter Calls",
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -139,33 +278,36 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Call History',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onBackground,
-                      ),
-                ),
-              ),
               const SizedBox(height: 16),
               Expanded(
-                child: _callList.isEmpty
+                child: _isLoading
                     ? Center(
-                        child: _errorMessage.isEmpty
-                            ? CircularProgressIndicator()
-                            : Text(_errorMessage),
+                        child: CircularProgressIndicator(),
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: _getAllCalls().length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final call = _getAllCalls()[index];
-                          return CallHistoryTile(call: call);
-                        },
-                      ),
+                    : _filteredCallList.isEmpty
+                        ? Center(
+                            child: Text(
+                              _errorMessage.isEmpty
+                                  ? _selectedFilter == "incoming"
+                                      ? 'No incoming calls found matching "$_searchQuery".'
+                                      : _selectedFilter == "outgoing"
+                                          ? 'No outgoing calls found matching "$_searchQuery".'
+                                          : _selectedFilter == "missed"
+                                              ? 'No missed calls found matching "$_searchQuery".'
+                                              : 'No calls found matching "$_searchQuery".'
+                                  : _errorMessage,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            itemCount: _filteredCallList.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final call = _filteredCallList[index];
+                              return CallHistoryTile(call: call);
+                            },
+                          ),
               ),
             ],
           ),

@@ -16,6 +16,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   bool _isLoading = true; // Flag to show loading indicator
   String? _errorMessage; // To show an error message if data fetch fails
   String? _userId; // Variable to store the dynamic user ID
+  String _searchQuery = ""; // Add search query state
 
   @override
   void initState() {
@@ -111,6 +112,22 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
   }
 
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
+
+  List<ContactInfo> _getFilteredContacts() {
+    if (_searchQuery.isEmpty) {
+      return _contactsList;
+    }
+    return _contactsList.where((contact) {
+      return contact.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             contact.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
+
   List<ContactInfo> _getAllContacts() {
     return _contactsList;
   }
@@ -118,6 +135,29 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.blue,
+        title: Text("Contacts"),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Search contacts...',
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -132,16 +172,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Contacts',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onBackground,
-                      ),
-                ),
-              ),
+              // Removed the text "Contacts" below the app bar
               const SizedBox(height: 16),
               Expanded(
                 child: _isLoading
@@ -155,21 +186,21 @@ class _ContactsScreenState extends State<ContactsScreen> {
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           )
-                        : _contactsList.isEmpty
+                        : _getFilteredContacts().isEmpty
                             ? Center(
                                 child: Text(
-                                  'No contacts available',
+                                  'No contacts found matching "$_searchQuery".',
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                               )
                             : ListView.separated(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 8),
-                                itemCount: _getAllContacts().length,
+                                itemCount: _getFilteredContacts().length,
                                 separatorBuilder: (context, index) =>
                                     const SizedBox(height: 10),
                                 itemBuilder: (context, index) {
-                                  final contact = _getAllContacts()[index];
+                                  final contact = _getFilteredContacts()[index];
                                   return ContactTile(contact: contact);
                                 },
                               ),

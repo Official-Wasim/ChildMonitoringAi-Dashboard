@@ -5,13 +5,14 @@ class LocationInfo {
   final double latitude;
   final double longitude;
   final DateTime timestamp;
-  String address;
+  final double accuracy;
 
-  LocationInfo(
-      {required this.latitude,
-      required this.longitude,
-      required this.timestamp,
-      this.address = 'Address not available'}); // Default value for address
+  LocationInfo({
+    required this.latitude,
+    required this.longitude,
+    required this.timestamp,
+    required this.accuracy,
+  });
 }
 
 class LocationsScreen extends StatefulWidget {
@@ -26,10 +27,9 @@ class _LocationsScreenState extends State<LocationsScreen> {
   List<LocationInfo> locationsList = [];
   bool isLoading = true;
 
-  // Hardcoded values
-  final String uniqueUserId = 'uniqueUserId'; // Replace with dynamic user ID
-  final String phoneModel =
-      'sdk_gphone64_x86_64'; // Replace with dynamic phone model
+  // Hardcoded values for userId and phoneModel
+  final String uniqueUserId = 'rgNHZYmejJd6D9r5nvyjSKknryA3'; // Replace with dynamic user ID
+  final String phoneModel = 'sdk_gphone64_x86_64'; // Replace with dynamic phone model
 
   @override
   void initState() {
@@ -50,26 +50,27 @@ class _LocationsScreenState extends State<LocationsScreen> {
 
         final List<LocationInfo> fetchedLocations = [];
 
-        for (var timestampKey in locationsData.keys) {
-          final locationEntries = locationsData[timestampKey];
-          final locationMap = Map<String, dynamic>.from(locationEntries);
+        // Loop through the keys (e.g., 2024-12-19, 2024-12-22)
+        for (var dateKey in locationsData.keys) {
+          final locationDetails = Map<String, dynamic>.from(locationsData[dateKey]);
 
-          for (var entryKey in locationMap.keys) {
-            final locationDetails =
-                Map<String, dynamic>.from(locationMap[entryKey]);
-            final latitude =
-                (locationDetails['latitude'] as num?)?.toDouble() ?? 0.0;
-            final longitude =
-                (locationDetails['longitude'] as num?)?.toDouble() ?? 0.0;
-            final timestamp =
-                (locationDetails['timestamp'] as num?)?.toInt() ?? 0;
+          // Extract the location details
+          final latitude = (locationDetails['latitude'] as num?)?.toDouble() ?? 0.0;
+          final longitude = (locationDetails['longitude'] as num?)?.toDouble() ?? 0.0;
+          final accuracy = (locationDetails['accuracy'] as num?)?.toDouble() ?? 0.0;
+          final timestampStr = locationDetails['timestamp'] as String?;
 
-            fetchedLocations.add(LocationInfo(
-              latitude: latitude,
-              longitude: longitude,
-              timestamp: DateTime.fromMillisecondsSinceEpoch(timestamp),
-            ));
-          }
+          // Convert timestamp string to DateTime
+          DateTime timestamp = DateTime.fromMillisecondsSinceEpoch(
+              int.tryParse(timestampStr ?? '0') ?? 0);
+
+          // Create a LocationInfo object and add it to the list
+          fetchedLocations.add(LocationInfo(
+            latitude: latitude,
+            longitude: longitude,
+            timestamp: timestamp,
+            accuracy: accuracy,
+          ));
         }
 
         // Sort the list to show the latest location first
@@ -167,17 +168,14 @@ class _LocationsScreenState extends State<LocationsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    location.address != ''
-                                        ? 'Address: ${location.address}'
-                                        : 'Address not available',
+                                    location.accuracy != 0.0
+                                        ? 'Accuracy: ${location.accuracy} meters'
+                                        : 'Accuracy not available',
                                     style: const TextStyle(color: Colors.black),
                                   ),
                                   Text(
-                                    location.timestamp.millisecondsSinceEpoch !=
-                                            0
-                                        ? 'Date: ${location.timestamp.day}/${location.timestamp.month}/${location.timestamp.year}\n'
-                                            'Time: ${location.timestamp.hour}:${location.timestamp.minute}'
-                                        : 'No timestamp available',
+                                    'Date: ${location.timestamp.day}/${location.timestamp.month}/${location.timestamp.year}\n'
+                                    'Time: ${location.timestamp.hour}:${location.timestamp.minute}',
                                     style: const TextStyle(color: Colors.grey),
                                   ),
                                 ],

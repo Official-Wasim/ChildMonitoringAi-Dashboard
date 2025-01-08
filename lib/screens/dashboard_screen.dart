@@ -193,14 +193,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildDashboardCard(context, Icons.apps, 'Apps', 10, () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AppsScreen()),
+                    MaterialPageRoute(builder: (context) =>  AppsScreen()),
                   );
                 }),
                 _buildDashboardCard(context, Icons.web, 'Sites', 10, () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const WebVisitHistoryScreen()),
+                        builder: (context) => WebVisitHistoryPage()),
                   );
                 }),
                 _buildDashboardCard(context, Icons.chat_bubble,

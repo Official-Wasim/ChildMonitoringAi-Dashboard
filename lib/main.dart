@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/auth_screen.dart'; // Import the login screen
 import 'screens/dashboard_screen.dart'; // Import the dashboard screen
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
+import 'package:url_launcher/url_launcher.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -13,7 +13,11 @@ class SmsHistoryScreen extends StatefulWidget {
 class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   List<SmsInfo> _smsList = [];
+  List<SmsInfo> _filteredSmsList = [];
   String _errorMessage = '';
+  String _searchQuery = ""; // Add search query state
+  String _selectedFilter = "all"; // "all", "incoming", "outgoing"
+  bool _isLoading = true; // Add loading state
 
   @override
   void initState() {
@@ -26,6 +30,7 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
     if (user == null) {
       setState(() {
         _errorMessage = 'User is not logged in';
+        _isLoading = false; // Set loading state to false
       });
       return;
     }
@@ -68,24 +73,105 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
 
         setState(() {
           _smsList = fetchedSms;
+          _filteredSmsList = fetchedSms;
           _errorMessage = ''; 
+          _isLoading = false; // Set loading state to false
         });
       } else {
         setState(() {
           _smsList = [];
+          _filteredSmsList = [];
           _errorMessage = 'No SMS data found';
+          _isLoading = false; // Set loading state to false
         });
       }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error fetching SMS data: $e';
         _smsList = [];
+        _filteredSmsList = [];
+        _isLoading = false; // Set loading state to false
       });
     }
   }
 
-  List<SmsInfo> _getAllSms() {
-    return _smsList;
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+      _applyFilters();
+    });
+  }
+
+  void _applyFilters() {
+    final sms = _smsList;
+    setState(() {
+      _filteredSmsList = sms.where((sms) {
+        if (_selectedFilter == "incoming") {
+          return sms.type == 1;
+        } else if (_selectedFilter == "outgoing") {
+          return sms.type == 2;
+        }
+        return true; // Default is "all"
+      }).where((sms) {
+        if (_searchQuery.isEmpty) {
+          return true;
+        }
+        return sms.address.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               sms.body.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    });
+  }
+
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Filter SMS"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<String>(
+                value: "all",
+                groupValue: _selectedFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFilter = value!;
+                    _applyFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                title: Text("Show All"),
+              ),
+              RadioListTile<String>(
+                value: "incoming",
+                groupValue: _selectedFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFilter = value!;
+                    _applyFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                title: Text("Incoming SMS"),
+              ),
+              RadioListTile<String>(
+                value: "outgoing",
+                groupValue: _selectedFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFilter = value!;
+                    _applyFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                title: Text("Outgoing SMS"),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   String _getFormattedDate(int timestamp) {
@@ -117,6 +203,40 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.blue,
+        title: Text("SMS History"),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search SMS...',
+                      prefixIcon: Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.filter_list),
+                  onPressed: _showFilterDialog,
+                  tooltip: "Filter SMS",
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -131,44 +251,35 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'SMS History',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onBackground,
-                      ),
-                ),
-              ),
               const SizedBox(height: 16),
-              if (_errorMessage.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    _errorMessage,
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
               Expanded(
-                child: _smsList.isEmpty
+                child: _isLoading
                     ? Center(
-                        child: _errorMessage.isEmpty
-                            ? CircularProgressIndicator()
-                            : Text(_errorMessage),
+                        child: CircularProgressIndicator(),
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        itemCount: _getAllSms().length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final sms = _getAllSms()[index];
-                          return SmsHistoryTile(
-                              sms: sms, formattedDate: _getFormattedDate(sms.timestamp));
-                        },
-                      ),
+                    : _filteredSmsList.isEmpty
+                        ? Center(
+                            child: Text(
+                              _errorMessage.isEmpty
+                                  ? _selectedFilter == "incoming"
+                                      ? 'No incoming SMS found matching "$_searchQuery".'
+                                      : _selectedFilter == "outgoing"
+                                          ? 'No outgoing SMS found matching "$_searchQuery".'
+                                          : 'No SMS found matching "$_searchQuery".'
+                                  : _errorMessage,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            itemCount: _filteredSmsList.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final sms = _filteredSmsList[index];
+                              return SmsHistoryTile(
+                                  sms: sms, formattedDate: _getFormattedDate(sms.timestamp));
+                            },
+                          ),
               ),
             ],
           ),
@@ -183,14 +294,14 @@ class SmsInfo {
   final String address;
   final String body;
   final int timestamp;
-  final int type; // Add the type property
+  final int type;
 
   SmsInfo({
     required this.date,
     required this.address,
     required this.body,
     required this.timestamp,
-    required this.type, // Add the type parameter to the constructor
+    required this.type,
   });
 }
 
@@ -247,7 +358,7 @@ class SmsHistoryTile extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                messageIcon,  // Dynamically set icon based on SMS type
+                messageIcon,
                 color: Colors.blue,
                 size: 24,
               ),
@@ -289,4 +400,3 @@ class SmsHistoryTile extends StatelessWidget {
     );
   }
 }
-
