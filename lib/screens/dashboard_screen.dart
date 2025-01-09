@@ -10,6 +10,7 @@ import 'contacts_screen.dart';
 import 'apps_screen.dart';
 import 'sites_screen.dart';
 import 'instant_messaging_screen.dart';
+import 'remote_commands_screen.dart'; // Import RemoteControlScreen
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -77,7 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           CurvedNavigationBarItem(
             child: Icon(Icons.chat_bubble_outline),
-            label: 'Chat',
+            label: 'Remote Control', // Change label to 'Remote Control'
           ),
           CurvedNavigationBarItem(
             child: Icon(Icons.newspaper),
@@ -97,6 +98,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           setState(() {
             _page = index;
           });
+          if (index == 2) { // Check if 'Remote Control' is selected
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RemoteControlScreen()),
+            );
+          }
         },
         letIndexChange: (index) => true,
       ),
