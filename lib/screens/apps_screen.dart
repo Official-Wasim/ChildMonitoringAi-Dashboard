@@ -12,11 +12,13 @@ class AppsScreen extends StatefulWidget {
 class _AppsScreenState extends State<AppsScreen> {
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   String _userId = "";
-  final String _phoneModel = "sdk_gphone64_x86_64"; // Replace dynamically if needed
+  final String _phoneModel =
+      "sdk_gphone64_x86_64"; // Replace dynamically if needed
   Map<String, List<Map<String, dynamic>>> _appsData = {};
   List<Map<String, dynamic>> _filteredApps = [];
   bool _isLoading = true;
-  final RefreshController _refreshController = RefreshController(initialRefresh: false);
+  final RefreshController _refreshController =
+      RefreshController(initialRefresh: false);
   String _searchQuery = "";
   String _selectedFilter = "all"; // "all", "installed", "uninstalled"
 
@@ -49,7 +51,9 @@ class _AppsScreenState extends State<AppsScreen> {
   Future<void> _fetchAppsData({bool isRefresh = false}) async {
     if (_userId.isEmpty) return;
     try {
-      final appsSnapshot = await _databaseRef.child('users/$_userId/phones/$_phoneModel/apps').get();
+      final appsSnapshot = await _databaseRef
+          .child('users/$_userId/phones/$_phoneModel/apps')
+          .get();
 
       if (appsSnapshot.exists) {
         final data = Map<String, dynamic>.from(appsSnapshot.value as Map);
@@ -110,8 +114,14 @@ class _AppsScreenState extends State<AppsScreen> {
         }
         return true; // Default is "all"
       }).where((app) {
-        return app['appName'].toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            app['packageName'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
+        return app['appName']
+                .toString()
+                .toLowerCase()
+                .contains(_searchQuery.toLowerCase()) ||
+            app['packageName']
+                .toString()
+                .toLowerCase()
+                .contains(_searchQuery.toLowerCase());
       }).toList();
     });
   }

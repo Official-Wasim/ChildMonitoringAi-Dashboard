@@ -28,8 +28,10 @@ class _LocationsScreenState extends State<LocationsScreen> {
   bool isLoading = true;
 
   // Hardcoded values for userId and phoneModel
-  final String uniqueUserId = 'rgNHZYmejJd6D9r5nvyjSKknryA3'; // Replace with dynamic user ID
-  final String phoneModel = 'sdk_gphone64_x86_64'; // Replace with dynamic phone model
+  final String uniqueUserId =
+      'rgNHZYmejJd6D9r5nvyjSKknryA3'; // Replace with dynamic user ID
+  final String phoneModel =
+      'sdk_gphone64_x86_64'; // Replace with dynamic phone model
 
   @override
   void initState() {
@@ -52,12 +54,16 @@ class _LocationsScreenState extends State<LocationsScreen> {
 
         // Loop through the keys (e.g., 2024-12-19, 2024-12-22)
         for (var dateKey in locationsData.keys) {
-          final locationDetails = Map<String, dynamic>.from(locationsData[dateKey]);
+          final locationDetails =
+              Map<String, dynamic>.from(locationsData[dateKey]);
 
           // Extract the location details
-          final latitude = (locationDetails['latitude'] as num?)?.toDouble() ?? 0.0;
-          final longitude = (locationDetails['longitude'] as num?)?.toDouble() ?? 0.0;
-          final accuracy = (locationDetails['accuracy'] as num?)?.toDouble() ?? 0.0;
+          final latitude =
+              (locationDetails['latitude'] as num?)?.toDouble() ?? 0.0;
+          final longitude =
+              (locationDetails['longitude'] as num?)?.toDouble() ?? 0.0;
+          final accuracy =
+              (locationDetails['accuracy'] as num?)?.toDouble() ?? 0.0;
           final timestampStr = locationDetails['timestamp'] as String?;
 
           // Convert timestamp string to DateTime

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
+import 'instant_messaging_apps.dart';
 import 'sms_history_screen.dart';
 import 'call_history_screen.dart';
 import 'mms_history_screen.dart';
@@ -43,7 +44,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Sign out the user
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
-    Navigator.of(context).pushReplacementNamed('/AuthScreen'); // Navigate to login screen
+    Navigator.of(context)
+        .pushReplacementNamed('/AuthScreen'); // Navigate to login screen
   }
 
   @override
@@ -98,10 +100,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           setState(() {
             _page = index;
           });
-          if (index == 2) { // Check if 'Remote Control' is selected
+          if (index == 2) {
+            // Check if 'Remote Control' is selected
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const RemoteControlScreen()),
+              MaterialPageRoute(
+                  builder: (context) => const RemoteControlScreen()),
             );
           }
         },
@@ -200,7 +204,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildDashboardCard(context, Icons.apps, 'Apps', 10, () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) =>  AppsScreen()),
+                    MaterialPageRoute(builder: (context) => AppsScreen()),
                   );
                 }),
                 _buildDashboardCard(context, Icons.web, 'Sites', 10, () {
@@ -215,7 +219,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const InstantMessagingScreen()),
+                        builder: (context) =>
+                             InstantMessagingAppsScreen()),
                   );
                 }),
               ],
