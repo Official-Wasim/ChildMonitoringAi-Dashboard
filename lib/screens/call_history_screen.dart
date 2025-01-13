@@ -38,7 +38,8 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
     }
 
     final String uniqueUserId = user.uid;
-    final String phoneModel = 'sdk_gphone64_x86_64'; // Replace with dynamic phone model
+    final String phoneModel =
+        'sdk_gphone64_x86_64'; // Replace with dynamic phone model
 
     try {
       final callSnapshot = await _databaseRef
@@ -64,17 +65,21 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
               timestamp: DateTime.fromMillisecondsSinceEpoch(
                   callMap['timestamp'] is int
                       ? callMap['timestamp']
-                      : int.tryParse(callMap['timestamp'].toString()) ?? 0), // Ensure timestamp is converted to DateTime
-              type: _getCallType(callMap['type'].toString()), // Ensure type is parsed as a string
+                      : int.tryParse(callMap['timestamp'].toString()) ??
+                          0), // Ensure timestamp is converted to DateTime
+              type: _getCallType(callMap['type']
+                  .toString()), // Ensure type is parsed as a string
               duration: Duration(
                   seconds: callMap['duration'] is int
                       ? callMap['duration']
-                      : int.tryParse(callMap['duration'].toString()) ?? 0), // Ensure duration is an integer
+                      : int.tryParse(callMap['duration'].toString()) ??
+                          0), // Ensure duration is an integer
             ));
           });
         });
 
-        fetchedCalls.sort((a, b) => b.timestamp.compareTo(a.timestamp)); // Sort by timestamp in descending order
+        fetchedCalls.sort((a, b) => b.timestamp
+            .compareTo(a.timestamp)); // Sort by timestamp in descending order
 
         setState(() {
           _callList = fetchedCalls;
@@ -117,7 +122,8 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
       }
     } catch (e) {
       debugPrint('Error parsing timestamp: $e');
-      return DateTime.now(); // Return the current time in case of a parsing error
+      return DateTime
+          .now(); // Return the current time in case of a parsing error
     }
   }
 
@@ -158,7 +164,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
           return true;
         }
         return call.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-               call.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase());
+            call.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
     });
   }
@@ -300,9 +306,11 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                             ),
                           )
                         : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                             itemCount: _filteredCallList.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 10),
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 10),
                             itemBuilder: (context, index) {
                               final call = _filteredCallList[index];
                               return CallHistoryTile(call: call);
@@ -475,7 +483,8 @@ class CallHistoryTile extends StatelessWidget {
     } else if (dateToCheck == yesterday) {
       return 'Yesterday ${DateFormat('HH:mm').format(dateTime)}';
     } else {
-      return DateFormat('yyyy-MM-dd HH:mm').format(dateTime); // Show date and time
+      return DateFormat('yyyy-MM-dd HH:mm')
+          .format(dateTime); // Show date and time
     }
   }
 

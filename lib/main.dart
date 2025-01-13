@@ -4,10 +4,15 @@ import 'screens/auth_screen.dart'; // Import the login screen
 import 'screens/dashboard_screen.dart'; // Import the dashboard screen
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 import 'package:url_launcher/url_launcher.dart'; // Add this import
+import 'screens/instant_messaging_apps.dart'; // Import the instant messaging apps screen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  try {
+    await Firebase.initializeApp(); // Initialize Firebase
+  } catch (e) {
+    debugPrint('Error initializing Firebase: $e');
+  }
   runApp(MyApp());
 }
 
@@ -16,7 +21,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Firebase Login App',
+      title: 'Instant Messaging Apps',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -26,6 +31,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/AuthScreen': (context) => AuthScreen(), // Define the route
         '/DashboardScreen': (context) => DashboardScreen(),
+        '/InstantMessagingAppsScreen': (context) =>
+            InstantMessagingAppsScreen(), // Define the route
       },
     );
   }
@@ -41,6 +48,7 @@ class AuthWrapper extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
+          debugPrint('Error in authStateChanges: ${snapshot.error}');
           return Center(child: Text('Something went wrong'));
         } else if (snapshot.hasData) {
           return DashboardScreen(); // User is logged in

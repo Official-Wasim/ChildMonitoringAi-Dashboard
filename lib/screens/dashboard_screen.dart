@@ -10,7 +10,6 @@ import 'locations_screen.dart';
 import 'contacts_screen.dart';
 import 'apps_screen.dart';
 import 'sites_screen.dart';
-import 'instant_messaging_screen.dart';
 import 'remote_commands_screen.dart'; // Import RemoteControlScreen
 
 class DashboardScreen extends StatefulWidget {
@@ -31,36 +30,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Fetch username from FirebaseAuth
   Future<void> _fetchUsername() async {
-    final User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        _username = user.displayName ?? 'User'; // Use displayName if available
-      });
-    } else {
-      debugPrint('No user is signed in');
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        setState(() {
+          _username = user.displayName ?? 'User'; // Use displayName if available
+        });
+      } else {
+        debugPrint('No user is signed in');
+      }
+    } catch (e) {
+      debugPrint('Error fetching username: $e');
     }
   }
 
   // Sign out the user
   Future<void> _signOut() async {
-    await FirebaseAuth.instance.signOut();
-    Navigator.of(context)
-        .pushReplacementNamed('/AuthScreen'); // Navigate to login screen
+    try {
+      await FirebaseAuth.instance.signOut();
+      Navigator.of(context).pushReplacementNamed('/AuthScreen'); // Navigate to login screen
+    } catch (e) {
+      debugPrint('Error signing out: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding:
+              const EdgeInsets.all(8.0), // Add padding to adjust the avatar
+          child: CircleAvatar(
+            radius: 15, // Make the avatar smaller
+            backgroundColor: Colors.white,
+            child: Text(
+              _username.isNotEmpty
+                  ? _username[0]
+                  : 'U', // Check if _username is not empty
+              style: TextStyle(
+                  fontSize: 16, // Adjust font size accordingly
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueAccent),
+            ),
+          ),
+        ),
         title: const Text(
           'Dashboard',
-          style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              color: Colors.white), // Change text color to white
         ),
         centerTitle: true,
         backgroundColor: Colors.blueAccent,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout,
+                color: Colors.white), // Change icon color to white
+            tooltip: 'Logout', // Add tooltip
             onPressed: _signOut, // Logout button
           ),
         ],
@@ -75,20 +103,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
             label: 'Home',
           ),
           CurvedNavigationBarItem(
-            child: Icon(Icons.search),
-            label: 'Search',
+            child: Icon(Icons.history),
+            label: 'Recent',
           ),
           CurvedNavigationBarItem(
             child: Icon(Icons.chat_bubble_outline),
-            label: 'Remote Control', // Change label to 'Remote Control'
+            label: 'Remote', // Change label to 'Remote Control'
           ),
           CurvedNavigationBarItem(
-            child: Icon(Icons.newspaper),
-            label: 'Feed',
+            child: Icon(Icons.bar_chart),
+            label: 'Stats',
           ),
           CurvedNavigationBarItem(
-            child: Icon(Icons.perm_identity),
-            label: 'Personal',
+            child: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
         color: Colors.white,
@@ -219,8 +247,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) =>
-                             InstantMessagingAppsScreen()),
+                        builder: (context) => InstantMessagingAppsScreen()),
                   );
                 }),
               ],
