@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'screens/auth_screen.dart'; // Import the login screen
 import 'screens/dashboard_screen.dart'; // Import the dashboard screen
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
-import 'package:url_launcher/url_launcher.dart'; // Add this import
 import 'screens/instant_messaging_apps.dart'; // Import the instant messaging apps screen
+import 'package:firebase_database/firebase_database.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +13,12 @@ void main() async {
   } catch (e) {
     debugPrint('Error initializing Firebase: $e');
   }
+
+  // Enable Firebase Database persistence
+  FirebaseDatabase.instance.setPersistenceEnabled(true);
+  FirebaseDatabase.instance
+      .setPersistenceCacheSizeBytes(10000000); // 10MB cache
+
   runApp(MyApp());
 }
 

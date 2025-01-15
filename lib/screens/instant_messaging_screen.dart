@@ -5,7 +5,8 @@ class InstantMessagingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> messagesList = List.generate(10, (index) => 'Message $index');
+    final List<String> messagesList =
+        List.generate(10, (index) => 'Message $index');
 
     return Scaffold(
       appBar: AppBar(
@@ -21,4 +22,4 @@ class InstantMessagingScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

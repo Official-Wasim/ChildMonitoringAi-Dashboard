@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
+import 'package:sticky_headers/sticky_headers/widget.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
 
 class ContactsScreen extends StatefulWidget {
-  const ContactsScreen({Key? key}) : super(key: key);
+  final String phoneModel; // Add this line
+
+  ContactsScreen({required this.phoneModel}); // Modify constructor
 
   @override
   _ContactsScreenState createState() => _ContactsScreenState();
@@ -17,6 +21,28 @@ class _ContactsScreenState extends State<ContactsScreen> {
   String? _errorMessage; // To show an error message if data fetch fails
   String? _userId; // Variable to store the dynamic user ID
   String _searchQuery = ""; // Add search query state
+  final RefreshController _refreshController =
+      RefreshController(initialRefresh: false); // Add this line
+
+  static const int _itemsPerPage = 20;
+  int _currentPage = 0;
+  bool _hasMoreData = true;
+
+  List<ContactInfo> get _paginatedContacts {
+    final startIndex = 0;
+    final endIndex = (_currentPage + 1) * _itemsPerPage;
+    if (startIndex >= _getFilteredContacts().length) return [];
+    return _getFilteredContacts()
+        .sublist(startIndex, endIndex.clamp(0, _getFilteredContacts().length));
+  }
+
+  void _loadMoreData() {
+    setState(() {
+      _currentPage++;
+      _hasMoreData =
+          (_currentPage + 1) * _itemsPerPage < _getFilteredContacts().length;
+    });
+  }
 
   @override
   void initState() {
@@ -44,54 +70,68 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _isLoading = false;
         _errorMessage = 'Error fetching user ID: $e';
       });
-      debugPrint('Error fetching user ID: $e');
     }
   }
 
-  Future<void> _fetchContactsData() async {
-    final phoneModel = 'sdk_gphone64_x86_64'; // Keep the phone model hardcoded
-
-    if (_userId == null) return; // Ensure user ID is available before fetching data
+  Future<void> _fetchContactsData({bool isRefresh = false}) async {
+    if (_userId == null)
+      return; // Ensure user ID is available before fetching data
 
     try {
-      debugPrint('Fetching data from Firebase...');
       final contactsSnapshot = await _databaseRef
-          .child('users/$_userId/phones/$phoneModel/contacts')
+          .child(
+              'users/$_userId/phones/${widget.phoneModel}/contacts') // Use widget.phoneModel
           .get();
 
       if (contactsSnapshot.exists) {
-        debugPrint('Data fetched successfully: ${contactsSnapshot.value}');
         final dynamic contactsData = contactsSnapshot.value;
 
         final List<ContactInfo> fetchedContacts = [];
 
         if (contactsData is Map) {
           contactsData.forEach((key, value) {
-            final contactMap = Map<String, dynamic>.from(value as Map<dynamic, dynamic>);
-            fetchedContacts.add(ContactInfo(
-              name: contactMap['name'] ?? 'Unknown',
-              phoneNumber: contactMap['number'] ?? 'Unknown',
-              date: DateTime.fromMillisecondsSinceEpoch(
-                      contactMap['creationTime'] ?? 0)
-                  .toString(), // Convert timestamp to a readable date
-            ));
+            if (value is Map) {
+              final contactMap = Map<String, dynamic>.from(value);
+
+              // Check for both 'number' and 'phoneNumber' keys
+              final phoneNumber = contactMap['phoneNumber'] ??
+                  contactMap['number'] ??
+                  contactMap['phone'] ??
+                  'Unknown';
+
+              fetchedContacts.add(ContactInfo(
+                name: contactMap['name'] ?? 'Unknown',
+                phoneNumber: phoneNumber,
+                date: DateTime.fromMillisecondsSinceEpoch(
+                        contactMap['creationTime'] ?? 0)
+                    .toString(),
+              ));
+            }
           });
         } else if (contactsData is List) {
           for (var value in contactsData) {
             if (value is Map) {
-              final contactMap = Map<String, dynamic>.from(value as Map<dynamic, dynamic>);
+              final contactMap = Map<String, dynamic>.from(value);
+
+              // Check for both 'number' and 'phoneNumber' keys
+              final phoneNumber = contactMap['phoneNumber'] ??
+                  contactMap['number'] ??
+                  contactMap['phone'] ??
+                  'Unknown';
+
               fetchedContacts.add(ContactInfo(
                 name: contactMap['name'] ?? 'Unknown',
-                phoneNumber: contactMap['number'] ?? 'Unknown',
+                phoneNumber: phoneNumber,
                 date: DateTime.fromMillisecondsSinceEpoch(
                         contactMap['creationTime'] ?? 0)
-                    .toString(), // Convert timestamp to a readable date
+                    .toString(),
               ));
             }
           }
         }
 
-        fetchedContacts.sort((a, b) => b.date.compareTo(a.date)); // Sort by date in descending order
+        fetchedContacts.sort((a, b) =>
+            b.date.compareTo(a.date)); // Sort by date in descending order
 
         setState(() {
           _contactsList = fetchedContacts;
@@ -108,7 +148,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _isLoading = false;
         _errorMessage = 'Error fetching data: $e';
       });
-      debugPrint('Error fetching contacts data: $e');
+    }
+    if (isRefresh) {
+      _refreshController.refreshCompleted();
     }
   }
 
@@ -124,7 +166,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
     return _contactsList.where((contact) {
       return contact.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             contact.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase());
+          contact.phoneNumber
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
@@ -132,26 +176,169 @@ class _ContactsScreenState extends State<ContactsScreen> {
     return _contactsList;
   }
 
+  Map<String, List<ContactInfo>> _groupContactsByDate(
+      List<ContactInfo> contacts) {
+    Map<String, List<ContactInfo>> grouped = {};
+    for (var contact in contacts) {
+      final dateStr =
+          DateFormat('dd MMM yyyy').format(DateTime.parse(contact.date));
+      grouped.putIfAbsent(dateStr, () => []);
+      grouped[dateStr]!.add(contact);
+    }
+    return Map.fromEntries(grouped.entries.toList()
+      ..sort((a, b) => DateFormat('dd MMM yyyy')
+          .parse(b.key)
+          .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
+  }
+
+  Widget _buildContactsList() {
+    final groupedContacts = _groupContactsByDate(_getFilteredContacts());
+    final theme = Theme.of(context);
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: groupedContacts.length,
+      itemBuilder: (context, index) {
+        final dateStr = groupedContacts.keys.elementAt(index);
+        final contactsForDate = groupedContacts[dateStr]!;
+
+        return StickyHeader(
+          header: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blue,
+                        Colors.blue.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    dateStr,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${contactsForDate.length} contacts',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, // Add this
+              children: contactsForDate
+                  .map((contact) => ContactTile(contact: contact))
+                  .toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title: Text("Contacts"),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Search contacts...',
-                prefixIcon: Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(160),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text(
+              "Contacts",
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(100),
+              child: Container(
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 30,
+                  top: 12,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    onChanged: _onSearchChanged,
+                    style: theme.textTheme.bodyMedium,
+                    decoration: InputDecoration(
+                      hintText: 'Search contacts...',
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(Icons.search,
+                          color: Colors
+                              .blue), // Change the search icon color to Colors.blue
+                      border: InputBorder.none,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -164,7 +351,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Colors.blue.withOpacity(0.1),
               Theme.of(context).colorScheme.background,
             ],
           ),
@@ -172,44 +359,36 @@ class _ContactsScreenState extends State<ContactsScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Removed the text "Contacts" below the app bar
               const SizedBox(height: 16),
               Expanded(
                 child: _isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(),
-                      )
-                    : _errorMessage != null
+                    ? Center(child: CircularProgressIndicator())
+                    : _getFilteredContacts().isEmpty
                         ? Center(
                             child: Text(
-                              _errorMessage!,
+                              'No contacts found matching "$_searchQuery".',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           )
-                        : _getFilteredContacts().isEmpty
-                            ? Center(
-                                child: Text(
-                                  'No contacts found matching "$_searchQuery".',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              )
-                            : ListView.separated(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
-                                itemCount: _getFilteredContacts().length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 10),
-                                itemBuilder: (context, index) {
-                                  final contact = _getFilteredContacts()[index];
-                                  return ContactTile(contact: contact);
-                                },
-                              ),
+                        : SmartRefresher(
+                            controller: _refreshController,
+                            enablePullDown: true,
+                            onRefresh: () =>
+                                _fetchContactsData(isRefresh: true),
+                            child: _buildContactsList(),
+                          ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    super.dispose();
   }
 }
 
@@ -230,13 +409,15 @@ class ContactTile extends StatelessWidget {
   final String formattedDate;
 
   ContactTile({super.key, required this.contact})
-      : formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(contact.date)); // Show date and time
+      : formattedDate = DateFormat('yyyy-MM-dd HH:mm')
+            .format(DateTime.parse(contact.date)); // Show date and time
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 8), // Add bottom margin
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),

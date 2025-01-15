@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:sticky_headers/sticky_headers/widget.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Add this import
+import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
 
 class CallHistoryScreen extends StatefulWidget {
   const CallHistoryScreen({Key? key}) : super(key: key);
@@ -18,14 +21,62 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   String _searchQuery = ""; // Add search query state
   String _selectedFilter = "all"; // "all", "incoming", "outgoing", "missed"
   bool _isLoading = true; // Add loading state
+  static const int _itemsPerPage = 20;
+  int _currentPage = 0;
+  bool _hasMoreData = true;
+  static const String SELECTED_DEVICE_KEY =
+      'selected_device'; // Add this constant
+  String _selectedDevice = ''; // Add this variable
+  final RefreshController _refreshController = RefreshController(initialRefresh: false); // Add this line
+
+  List<CallInfo> get _paginatedCalls {
+    final startIndex = 0;
+    final endIndex = (_currentPage + 1) * _itemsPerPage;
+    if (startIndex >= _filteredCallList.length) return [];
+    return _filteredCallList.sublist(
+        startIndex, endIndex.clamp(0, _filteredCallList.length));
+  }
+
+  void _loadMoreData() {
+    setState(() {
+      _currentPage++;
+      _hasMoreData =
+          (_currentPage + 1) * _itemsPerPage < _filteredCallList.length;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _fetchCallData();
+    _loadSelectedDevice(); // Add this method call
   }
 
-  Future<void> _fetchCallData() async {
+  // Add this method to load the selected device
+  Future<void> _loadSelectedDevice() async {
+    final prefs = await SharedPreferences.getInstance();
+    final selectedDevice = prefs.getString(SELECTED_DEVICE_KEY);
+    if (selectedDevice != null) {
+      setState(() {
+        _selectedDevice = selectedDevice;
+      });
+      _fetchCallData(); // Move fetchCallData here after device is loaded
+    } else {
+      setState(() {
+        _errorMessage = 'No device selected';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchCallData({bool isRefresh = false}) async {
+    if (_selectedDevice.isEmpty) {
+      setState(() {
+        _errorMessage = 'No device selected';
+        _isLoading = false;
+      });
+      return;
+    }
+
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       setState(() {
@@ -38,12 +89,10 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
     }
 
     final String uniqueUserId = user.uid;
-    final String phoneModel =
-        'sdk_gphone64_x86_64'; // Replace with dynamic phone model
 
     try {
       final callSnapshot = await _databaseRef
-          .child('users/$uniqueUserId/phones/$phoneModel/calls')
+          .child('users/$uniqueUserId/phones/$_selectedDevice/calls')
           .get();
 
       if (callSnapshot.exists) {
@@ -103,6 +152,9 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
         _errorMessage = 'Error fetching call data: $e'; // Set error message
         _isLoading = false; // Set loading state to false
       });
+    }
+    if (isRefresh) {
+      _refreshController.refreshCompleted();
     }
   }
 
@@ -173,60 +225,227 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text("Filter Calls"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<String>(
-                value: "all",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Show All"),
-              ),
-              RadioListTile<String>(
-                value: "incoming",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Incoming Calls"),
-              ),
-              RadioListTile<String>(
-                value: "outgoing",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Outgoing Calls"),
-              ),
-              RadioListTile<String>(
-                value: "missed",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Missed Calls"),
-              ),
-            ],
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            width: 340,
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.filter_list,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      "Filter Calls",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                ...["all", "incoming", "outgoing", "missed"].map((filter) {
+                  String title = filter[0].toUpperCase() + filter.substring(1);
+                  if (filter == "all") title = "Show All";
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          setState(() {
+                            _selectedFilter = filter;
+                            _applyFilters();
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedFilter == filter
+                                ? Colors.blue.withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _selectedFilter == filter
+                                  ? Colors.blue
+                                  : Colors.grey.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                filter == "incoming"
+                                    ? Icons.call_received
+                                    : filter == "outgoing"
+                                        ? Icons.call_made
+                                        : filter == "missed"
+                                            ? Icons.call_missed
+                                            : Icons.all_inclusive,
+                                color: _selectedFilter == filter
+                                    ? Colors.blue
+                                    : Colors.grey,
+                                size: 20,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  color: _selectedFilter == filter
+                                      ? Colors.blue
+                                      : Colors.black87,
+                                  fontWeight: _selectedFilter == filter
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              Spacer(),
+                              if (_selectedFilter == filter)
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+                SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Map<String, List<CallInfo>> _groupCallsByDate(List<CallInfo> calls) {
+    Map<String, List<CallInfo>> grouped = {};
+    for (var call in calls) {
+      final dateStr = DateFormat('dd MMM yyyy').format(call.timestamp);
+      grouped.putIfAbsent(dateStr, () => []);
+      grouped[dateStr]!.add(call);
+    }
+    return Map.fromEntries(grouped.entries.toList()
+      ..sort((a, b) => DateFormat('dd MMM yyyy')
+          .parse(b.key)
+          .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
+  }
+
+  Widget _buildCallsList() {
+    final groupedCalls = _groupCallsByDate(_filteredCallList);
+    final theme = Theme.of(context);
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: groupedCalls.length,
+      itemBuilder: (context, index) {
+        final dateStr = groupedCalls.keys.elementAt(index);
+        final callsForDate = groupedCalls[dateStr]!;
+
+        return StickyHeader(
+          header: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blue,
+                        Colors.blue.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    dateStr,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${callsForDate.length} calls',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Column(
+              children: callsForDate
+                  .map((call) => CallHistoryTile(call: call))
+                  .toList(),
+            ),
           ),
         );
       },
@@ -235,37 +454,101 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title: Text("Call History"),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: _onSearchChanged,
-                    decoration: InputDecoration(
-                      hintText: 'Search calls...',
-                      prefixIcon: Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+      appBar: PreferredSize(
+        preferredSize:
+            Size.fromHeight(160), // Adjusted for the search bar height
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text(
+              "Call History",
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(100),
+              child: Container(
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 30,
+                  top: 12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: TextField(
+                          onChanged: _onSearchChanged,
+                          style: theme.textTheme.bodyMedium,
+                          decoration: InputDecoration(
+                            hintText: 'Search calls...',
+                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                            prefixIcon:
+                                Icon(Icons.search, color: Colors.blue),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.filter_list, color: Colors.white),
+                        onPressed: _showFilterDialog,
+                        tooltip: "Filter Calls",
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: Icon(Icons.filter_list),
-                  onPressed: _showFilterDialog,
-                  tooltip: "Filter Calls",
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -276,7 +559,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Colors.blue.withOpacity(0.1),
               Theme.of(context).colorScheme.background,
             ],
           ),
@@ -287,9 +570,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
               const SizedBox(height: 16),
               Expanded(
                 child: _isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(),
-                      )
+                    ? Center(child: CircularProgressIndicator())
                     : _filteredCallList.isEmpty
                         ? Center(
                             child: Text(
@@ -305,16 +586,11 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            itemCount: _filteredCallList.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final call = _filteredCallList[index];
-                              return CallHistoryTile(call: call);
-                            },
+                        : SmartRefresher(
+                            controller: _refreshController,
+                            enablePullDown: true,
+                            onRefresh: () => _fetchCallData(isRefresh: true),
+                            child: _buildCallsList(),
                           ),
               ),
             ],
@@ -322,6 +598,12 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    super.dispose();
   }
 }
 
@@ -351,6 +633,7 @@ class CallHistoryTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4), // Added margin
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),

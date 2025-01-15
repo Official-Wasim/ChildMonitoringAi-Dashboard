@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
 
 class MmsHistoryScreen extends StatefulWidget {
   const MmsHistoryScreen({Key? key}) : super(key: key);
@@ -14,12 +15,39 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
   String _errorMessage = '';
   String _searchQuery = ""; // Add search query state
   String _selectedFilter = "all"; // "all", "incoming", "outgoing"
-  bool _isLoading = true; // Add loading state
+  final RefreshController _refreshController = RefreshController(initialRefresh: false); // Add this line
+
+  static const int _itemsPerPage = 20;
+  int _currentPage = 0;
+  bool _hasMoreData = true;
+
+  List<MmsInfo> get _paginatedMms {
+    final startIndex = 0;
+    final endIndex = (_currentPage + 1) * _itemsPerPage;
+    if (startIndex >= _filteredMmsList.length) return [];
+    return _filteredMmsList.sublist(
+        startIndex, endIndex.clamp(0, _filteredMmsList.length));
+  }
+
+  void _loadMoreData() {
+    setState(() {
+      _currentPage++;
+      _hasMoreData =
+          (_currentPage + 1) * _itemsPerPage < _filteredMmsList.length;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     // _fetchMmsData(); // Fetch data function will be added later
+  }
+
+  Future<void> _fetchMmsData({bool isRefresh = false}) async {
+    // ...existing code...
+    if (isRefresh) {
+      _refreshController.refreshCompleted();
+    }
   }
 
   void _onSearchChanged(String query) {
@@ -53,48 +81,143 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text("Filter MMS"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<String>(
-                value: "all",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Show All"),
-              ),
-              RadioListTile<String>(
-                value: "incoming",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Incoming MMS"),
-              ),
-              RadioListTile<String>(
-                value: "outgoing",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Outgoing MMS"),
-              ),
-            ],
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            width: 340,
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.filter_list,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      "Filter Messages",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                ...["all", "incoming", "outgoing"].map((filter) {
+                  String title = filter[0].toUpperCase() + filter.substring(1);
+                  if (filter == "all") title = "Show All";
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          setState(() {
+                            _selectedFilter = filter;
+                            _applyFilters();
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedFilter == filter
+                                ? Colors.blue.withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _selectedFilter == filter
+                                  ? Colors.blue
+                                  : Colors.grey.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                filter == "incoming"
+                                    ? Icons.call_received
+                                    : filter == "outgoing"
+                                        ? Icons.call_made
+                                        : Icons.all_inclusive,
+                                color: _selectedFilter == filter
+                                    ? Colors.blue
+                                    : Colors.grey,
+                                size: 20,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  color: _selectedFilter == filter
+                                      ? Colors.blue
+                                      : Colors.black87,
+                                  fontWeight: _selectedFilter == filter
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              Spacer(),
+                              if (_selectedFilter == filter)
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+                SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -129,38 +252,109 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
   }
 
   @override
+  void dispose() {
+    _refreshController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title: Text("MMS History"),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: _onSearchChanged,
-                    decoration: InputDecoration(
-                      hintText: 'Search MMS...',
-                      prefixIcon: Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+      extendBodyBehindAppBar: true, // Add this line
+      appBar: PreferredSize(
+        preferredSize:
+            Size.fromHeight(160), // Adjusted for the search bar height
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text(
+              "MMS History",
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(100),
+              child: Container(
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 30,
+                  top: 12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: TextField(
+                          onChanged: _onSearchChanged,
+                          style: theme.textTheme.bodyMedium,
+                          decoration: InputDecoration(
+                            hintText: 'Search MMS...',
+                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                            prefixIcon:
+                                Icon(Icons.search, color: Colors.blue),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.filter_list, color: Colors.white),
+                        onPressed: _showFilterDialog,
+                        tooltip: "Filter MMS",
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: Icon(Icons.filter_list),
-                  onPressed: _showFilterDialog,
-                  tooltip: "Filter MMS",
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -171,7 +365,7 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Colors.blue.withOpacity(0.1),
               Theme.of(context).colorScheme.background,
             ],
           ),
@@ -180,38 +374,53 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
           child: Column(
             children: [
               const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'Showing ${_paginatedMms.length} of ${_filteredMmsList.length} MMS',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
               Expanded(
-                child: _isLoading
+                child: _filteredMmsList.isEmpty
                     ? Center(
-                        child: CircularProgressIndicator(),
+                        child: Text(
+                          _errorMessage.isEmpty
+                              ? 'No MMS found'
+                              : _errorMessage,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       )
-                    : _filteredMmsList.isEmpty
-                        ? Center(
-                            child: Text(
-                              _errorMessage.isEmpty
-                                  ? _selectedFilter == "incoming"
-                                      ? 'No incoming MMS found matching "$_searchQuery".'
-                                      : _selectedFilter == "outgoing"
-                                          ? 'No outgoing MMS found matching "$_searchQuery".'
-                                          : 'No MMS found matching "$_searchQuery".'
-                                  : _errorMessage,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            itemCount: _filteredMmsList.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final mms = _filteredMmsList[index];
-                              return MmsHistoryTile(
-                                  mms: mms,
-                                  formattedDate:
-                                      _getFormattedDate(mms.timestamp));
-                            },
-                          ),
+                    : SmartRefresher(
+                        controller: _refreshController,
+                        enablePullDown: true,
+                        onRefresh: () => _fetchMmsData(isRefresh: true),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          itemCount:
+                              _paginatedMms.length + (_hasMoreData ? 1 : 0),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            if (index >= _paginatedMms.length) {
+                              return Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: ElevatedButton(
+                                    onPressed: _loadMoreData,
+                                    child: const Text('Load More'),
+                                  ),
+                                ),
+                              );
+                            }
+                            final mms = _paginatedMms[index];
+                            return MmsHistoryTile(
+                                mms: mms,
+                                formattedDate: _getFormattedDate(mms.timestamp));
+                          },
+                        ),
+                      ),
               ),
             ],
           ),

@@ -2,6 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:sticky_headers/sticky_headers/widget.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SmsHistoryScreen extends StatefulWidget {
   const SmsHistoryScreen({Key? key}) : super(key: key);
@@ -11,36 +14,83 @@ class SmsHistoryScreen extends StatefulWidget {
 }
 
 class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
+  static const String SELECTED_DEVICE_KEY = 'selected_device';
+  String _selectedDevice = '';
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   List<SmsInfo> _smsList = [];
   List<SmsInfo> _filteredSmsList = [];
   String _errorMessage = '';
-  String _searchQuery = ""; // Add search query state
-  String _selectedFilter = "all"; // "all", "incoming", "outgoing"
-  bool _isLoading = true; // Add loading state
+  String _searchQuery = "";
+  String _selectedFilter = "all";
+  bool _isLoading = true;
+  final RefreshController _refreshController =
+      RefreshController(initialRefresh: false);
+
+  static const int _itemsPerPage = 20;
+  int _currentPage = 0;
+  bool _hasMoreData = true;
+
+  List<SmsInfo> get _paginatedList {
+    final startIndex = 0;
+    final endIndex = (_currentPage + 1) * _itemsPerPage;
+    if (startIndex >= _filteredSmsList.length) return [];
+    return _filteredSmsList.sublist(
+        startIndex, endIndex.clamp(0, _filteredSmsList.length));
+  }
+
+  void _loadMoreData() {
+    setState(() {
+      _currentPage++;
+      _hasMoreData =
+          (_currentPage + 1) * _itemsPerPage < _filteredSmsList.length;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _fetchSmsData();
+    _loadSelectedDevice();
   }
 
-  Future<void> _fetchSmsData() async {
-    final User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+  Future<void> _loadSelectedDevice() async {
+    final prefs = await SharedPreferences.getInstance();
+    final selectedDevice = prefs.getString(SELECTED_DEVICE_KEY);
+    if (selectedDevice != null) {
       setState(() {
-        _errorMessage = 'User is not logged in';
-        _isLoading = false; // Set loading state to false
+        _selectedDevice = selectedDevice;
+      });
+      _fetchSmsData();
+    } else {
+      setState(() {
+        _errorMessage = 'No device selected';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchSmsData({bool isRefresh = false}) async {
+    if (_selectedDevice.isEmpty) {
+      setState(() {
+        _errorMessage = 'No device selected';
+        _isLoading = false;
       });
       return;
     }
 
-    final String uniqueUserId = user.uid; 
-    final String phoneModel = 'sdk_gphone64_x86_64'; 
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _errorMessage = 'User is not logged in';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final String uniqueUserId = user.uid;
 
     try {
       final smsSnapshot = await _databaseRef
-          .child('users/$uniqueUserId/phones/$phoneModel/sms')
+          .child('users/$uniqueUserId/phones/$_selectedDevice/sms')
           .get();
 
       if (smsSnapshot.exists) {
@@ -64,25 +114,25 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
                   : int.tryParse(smsData['timestamp'].toString()) ?? 0,
               type: smsData['type'] is int
                   ? smsData['type']
-                  : int.tryParse(smsData['type'].toString()) ?? 1, // Ensure type is an integer
+                  : int.tryParse(smsData['type'].toString()) ?? 1,
             ));
           });
         });
 
-        fetchedSms.sort((a, b) => b.timestamp.compareTo(a.timestamp)); // Sort by timestamp in descending order
+        fetchedSms.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
         setState(() {
           _smsList = fetchedSms;
           _filteredSmsList = fetchedSms;
-          _errorMessage = ''; 
-          _isLoading = false; // Set loading state to false
+          _errorMessage = '';
+          _isLoading = false;
         });
       } else {
         setState(() {
           _smsList = [];
           _filteredSmsList = [];
           _errorMessage = 'No SMS data found';
-          _isLoading = false; // Set loading state to false
+          _isLoading = false;
         });
       }
     } catch (e) {
@@ -90,9 +140,19 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
         _errorMessage = 'Error fetching SMS data: $e';
         _smsList = [];
         _filteredSmsList = [];
-        _isLoading = false; // Set loading state to false
+        _isLoading = false;
       });
     }
+    if (isRefresh) {
+      _refreshController.refreshCompleted();
+    }
+  }
+
+  Future<void> _refreshSmsData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    await _fetchSmsData();
   }
 
   void _onSearchChanged(String query) {
@@ -111,14 +171,16 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
         } else if (_selectedFilter == "outgoing") {
           return sms.type == 2;
         }
-        return true; // Default is "all"
+        return true;
       }).where((sms) {
         if (_searchQuery.isEmpty) {
           return true;
         }
         return sms.address.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-               sms.body.toLowerCase().contains(_searchQuery.toLowerCase());
+            sms.body.toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
+      _currentPage = 0;
+      _hasMoreData = _filteredSmsList.length > _itemsPerPage;
     });
   }
 
@@ -126,48 +188,143 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text("Filter SMS"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<String>(
-                value: "all",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Show All"),
-              ),
-              RadioListTile<String>(
-                value: "incoming",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Incoming SMS"),
-              ),
-              RadioListTile<String>(
-                value: "outgoing",
-                groupValue: _selectedFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFilter = value!;
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-                title: Text("Outgoing SMS"),
-              ),
-            ],
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            width: 340,
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.filter_list,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      "Filter Messages",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                ...["all", "incoming", "outgoing"].map((filter) {
+                  String title = filter[0].toUpperCase() + filter.substring(1);
+                  if (filter == "all") title = "Show All";
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          setState(() {
+                            _selectedFilter = filter;
+                            _applyFilters();
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedFilter == filter
+                                ? Colors.blue.withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _selectedFilter == filter
+                                  ? Colors.blue
+                                  : Colors.grey.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                filter == "incoming"
+                                    ? Icons.call_received
+                                    : filter == "outgoing"
+                                        ? Icons.call_made
+                                        : Icons.all_inclusive,
+                                color: _selectedFilter == filter
+                                    ? Colors.blue
+                                    : Colors.grey,
+                                size: 20,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  color: _selectedFilter == filter
+                                      ? Colors.blue
+                                      : Colors.black87,
+                                  fontWeight: _selectedFilter == filter
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              Spacer(),
+                              if (_selectedFilter == filter)
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+                SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -183,7 +340,7 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
     } else if (_isYesterday(dateTime, now)) {
       return 'Yesterday ${DateFormat('HH:mm').format(dateTime)}';
     } else {
-      return DateFormat('yyyy-MM-dd HH:mm').format(dateTime); // Show date and time
+      return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
     }
   }
 
@@ -200,39 +357,194 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
         dateTime.day == yesterday.day;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title: Text("SMS History"),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
+  Map<String, List<SmsInfo>> _groupSmsByDate(List<SmsInfo> messages) {
+    Map<String, List<SmsInfo>> grouped = {};
+    for (var message in messages) {
+      final dateStr = DateFormat('dd MMM yyyy')
+          .format(DateTime.fromMillisecondsSinceEpoch(message.timestamp));
+      grouped.putIfAbsent(dateStr, () => []);
+      grouped[dateStr]!.add(message);
+    }
+    return Map.fromEntries(grouped.entries.toList()
+      ..sort((a, b) => DateFormat('dd MMM yyyy')
+          .parse(b.key)
+          .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
+  }
+
+  Widget _buildSmsList() {
+    final groupedMessages = _groupSmsByDate(_filteredSmsList);
+    final theme = Theme.of(context);
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: groupedMessages.length,
+      itemBuilder: (context, index) {
+        final dateStr = groupedMessages.keys.elementAt(index);
+        final messagesForDate = groupedMessages[dateStr]!;
+
+        return StickyHeader(
+          header: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: _onSearchChanged,
-                    decoration: InputDecoration(
-                      hintText: 'Search SMS...',
-                      prefixIcon: Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blue,
+                        Colors.blue.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
                       ),
+                    ],
+                  ),
+                  child: Text(
+                    dateStr,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.filter_list),
-                  onPressed: _showFilterDialog,
-                  tooltip: "Filter SMS",
+                const SizedBox(width: 12),
+                Text(
+                  '${messagesForDate.length} messages',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
+            ),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Column(
+              children: messagesForDate
+                  .map((sms) => SmsHistoryTile(
+                        sms: sms,
+                        formattedDate: _getFormattedDate(sms.timestamp),
+                      ))
+                  .toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(160),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text(
+              "SMS History",
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(100),
+              child: Container(
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 30,
+                  top: 12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: TextField(
+                          onChanged: _onSearchChanged,
+                          style: theme.textTheme.bodyMedium,
+                          decoration: InputDecoration(
+                            hintText: 'Search SMS...',
+                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                            prefixIcon: Icon(Icons.search, color: Colors.blue),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.filter_list, color: Colors.white),
+                        onPressed: _showFilterDialog,
+                        tooltip: "Filter SMS",
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -243,7 +555,7 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Colors.blue.withOpacity(0.1),
               Theme.of(context).colorScheme.background,
             ],
           ),
@@ -254,9 +566,7 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
               const SizedBox(height: 16),
               Expanded(
                 child: _isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(),
-                      )
+                    ? Center(child: CircularProgressIndicator())
                     : _filteredSmsList.isEmpty
                         ? Center(
                             child: Text(
@@ -270,15 +580,11 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            itemCount: _filteredSmsList.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final sms = _filteredSmsList[index];
-                              return SmsHistoryTile(
-                                  sms: sms, formattedDate: _getFormattedDate(sms.timestamp));
-                            },
+                        : SmartRefresher(
+                            controller: _refreshController,
+                            enablePullDown: true,
+                            onRefresh: () => _fetchSmsData(isRefresh: true),
+                            child: _buildSmsList(),
                           ),
               ),
             ],
@@ -315,33 +621,125 @@ class SmsHistoryTile extends StatelessWidget {
     required this.formattedDate,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final smsDate = DateTime.fromMillisecondsSinceEpoch(sms.timestamp);
-
-    // Check the type of SMS and set the icon
-    IconData messageIcon = sms.type == 2 ? Icons.arrow_outward : Icons.arrow_downward;
-
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Full Message'),
-            content: Text(sms.body),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('Close'),
+  void _showMessageDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 400),
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: Offset(0, 10),
               ),
             ],
           ),
-        );
-      },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (sms.type == 2 ? Colors.blue : Colors.green)
+                          .withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      sms.type == 2 ? Icons.send : Icons.inbox,
+                      color: sms.type == 2 ? Colors.blue : Colors.green,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      sms.address,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    sms.type == 2 ? Icons.arrow_outward : Icons.arrow_downward,
+                    size: 14,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .secondary
+                        .withOpacity(0.7),
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    formattedDate,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .secondary
+                              .withOpacity(0.7),
+                        ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              Container(
+                constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.4),
+                child: SingleChildScrollView(
+                  child: Text(
+                    sms.body,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () => _showMessageDialog(context),
       child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
@@ -357,10 +755,29 @@ class SmsHistoryTile extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(
-                messageIcon,
-                color: Colors.blue,
-                size: 24,
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      sms.type == 2
+                          ? Colors.blue.withOpacity(0.3)
+                          : Colors.green.withOpacity(0.3),
+                      sms.type == 2
+                          ? Colors.blue.withOpacity(0.1)
+                          : Colors.green.withOpacity(0.1),
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  sms.type == 2 ? Icons.send : Icons.inbox,
+                  color: sms.type == 2 ? Colors.blue : Colors.green,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -375,11 +792,23 @@ class SmsHistoryTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      formattedDate,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.secondary.withOpacity(0.7),
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          sms.type == 2
+                              ? Icons.arrow_outward
+                              : Icons.arrow_downward,
+                          size: 14,
+                          color: theme.colorScheme.secondary.withOpacity(0.7),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          formattedDate,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.secondary.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
