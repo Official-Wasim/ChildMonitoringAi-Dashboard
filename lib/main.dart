@@ -1,15 +1,15 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'screens/auth_screen.dart'; // Import the login screen
-import 'screens/dashboard_screen.dart'; // Import the dashboard screen
-import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
-import 'screens/instant_messaging_apps.dart'; // Import the instant messaging apps screen
+import 'screens/auth_screen.dart'; 
+import 'screens/dashboard_screen.dart'; 
+import 'package:firebase_auth/firebase_auth.dart'; 
+import 'screens/instant_messaging_apps.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await Firebase.initializeApp(); // Initialize Firebase
+    await Firebase.initializeApp(); 
   } catch (e) {
     debugPrint('Error initializing Firebase: $e');
   }

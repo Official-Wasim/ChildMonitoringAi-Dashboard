@@ -3,7 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_screen.dart';
+import 'recents_screen.dart';
+import 'stats_screen.dart';
+import 'settings_screeen.dart';
 
 class RemoteControlScreen extends StatefulWidget {
   const RemoteControlScreen({super.key});
@@ -74,6 +78,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
     _tabController =
         TabController(length: 2, vsync: this); // Initialize before super
     super.initState();
+    _loadSelectedDevice(); // Add this line
     _initializeUser();
     _fetchCommandResults();
 
@@ -81,6 +86,10 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {});
+      }
+      if (_tabController.index == 1) {
+        // Refresh data when Results tab is clicked
+        _fetchCommandResults();
       }
     });
   }
@@ -92,6 +101,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
   }
 
   Future<void> _initializeUser() async {
+    if (!mounted) return; // Add this line
     setState(() {
       _isLoading = true;
     });
@@ -102,34 +112,63 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
         _userId = user.uid;
         await _fetchDevices();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not logged in!')),
-        );
+        if (mounted) {
+          // Add this check
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User not logged in!')),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error initializing user: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to fetch user data.')),
-      );
+      if (mounted) {
+        // Add this check
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to fetch user data.')),
+        );
+      }
     } finally {
+      if (mounted) {
+        // Add this check
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSelectedDevice() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDevice = prefs.getString('selected_device');
+    if (savedDevice != null && mounted) {
       setState(() {
-        _isLoading = false;
+        _selectedPhoneModel = savedDevice;
       });
     }
   }
 
   Future<void> _fetchDevices() async {
-    if (_userId == null) return;
+    if (_userId == null || !mounted) return; // Add this line
 
     try {
       final phonesSnapshot =
           await _databaseRef.child('users/$_userId/phones').get();
       if (phonesSnapshot.exists) {
-        _phoneModels = phonesSnapshot.children.map((e) => e.key!).toList();
-        setState(() {
-          _selectedPhoneModel =
-              _phoneModels.isNotEmpty ? _phoneModels.first : null;
-        });
+        final prefs = await SharedPreferences.getInstance();
+        final savedDevice = prefs.getString('selected_device');
+
+        if (mounted) {
+          setState(() {
+            _phoneModels = phonesSnapshot.children.map((e) => e.key!).toList();
+            // Use saved device if available and valid, otherwise use first device
+            if (savedDevice != null && _phoneModels.contains(savedDevice)) {
+              _selectedPhoneModel = savedDevice;
+            } else {
+              _selectedPhoneModel =
+                  _phoneModels.isNotEmpty ? _phoneModels.first : null;
+            }
+          });
+        }
       }
       // Ensure default values exist in the dropdown items
       if (!_phoneModels.contains(_selectedPhoneModel)) {
@@ -147,9 +186,50 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
       }
     } catch (e) {
       debugPrint('Error fetching devices: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error loading devices.')),
-      );
+      if (mounted) {
+        // Add this check
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error loading devices.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _fetchCommandResults() async {
+    if (_userId == null || _selectedPhoneModel == null || !mounted)
+      return; // Add this line
+
+    try {
+      final commandsSnapshot = await _databaseRef
+          .child('users/$_userId/phones/$_selectedPhoneModel/commands')
+          .get();
+
+      if (commandsSnapshot.exists) {
+        if (mounted) {
+          // Add this check
+          setState(() {
+            _commandResults = [];
+            for (var dateKey in commandsSnapshot.children) {
+              for (var commandSnapshot in dateKey.children) {
+                Map<String, dynamic> commandData =
+                    Map<String, dynamic>.from(commandSnapshot.value as Map);
+                _commandResults.add({
+                  'timestamp': commandSnapshot.key.toString(),
+                  'command': commandData['command'] ?? '',
+                  'lastUpdated': commandData['lastUpdated']?.toString() ?? '0',
+                  'result': commandData['result'] ?? '',
+                  'status': commandData['status'] ?? 'unknown',
+                });
+              }
+            }
+            // Sort by timestamp in descending order
+            _commandResults
+                .sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching command results: $e');
     }
   }
 
@@ -188,40 +268,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to send command.')),
       );
-    }
-  }
-
-  Future<void> _fetchCommandResults() async {
-    if (_userId == null || _selectedPhoneModel == null) return;
-
-    try {
-      final commandsSnapshot = await _databaseRef
-          .child('users/$_userId/phones/$_selectedPhoneModel/commands')
-          .get();
-
-      if (commandsSnapshot.exists) {
-        setState(() {
-          _commandResults = [];
-          for (var dateKey in commandsSnapshot.children) {
-            for (var commandSnapshot in dateKey.children) {
-              Map<String, dynamic> commandData =
-                  Map<String, dynamic>.from(commandSnapshot.value as Map);
-              _commandResults.add({
-                'timestamp': commandSnapshot.key.toString(),
-                'command': commandData['command'],
-                'lastUpdated': commandData['lastUpdated'].toString(),
-                'result': commandData['result'],
-                'status': commandData['status'],
-              });
-            }
-          }
-          // Sort by timestamp in descending order
-          _commandResults
-              .sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching command results: $e');
     }
   }
 
@@ -268,49 +314,53 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
 
   Widget _buildDeviceSelector() {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Send Commands to',
-            style: _labelStyle.copyWith(color: Colors.blue),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedPhoneModel,
-                isExpanded: true,
-                hint: Text('Select a device', style: _subtitleStyle),
-                icon: const Icon(Icons.phone_android),
-                style: _labelStyle,
-                items: _phoneModels.map((model) {
-                  return DropdownMenuItem(
-                    value: model,
-                    child: Text(model),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPhoneModel = value;
-                  });
-                },
-              ),
-            ),
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
           ),
         ],
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedPhoneModel,
+          isExpanded: true,
+          hint: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Select a device',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          icon: Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Icon(Icons.phone_android, color: Colors.blue),
+          ),
+          style: Theme.of(context).textTheme.bodyMedium,
+          items: _phoneModels.map((model) {
+            return DropdownMenuItem(
+              value: model,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(model),
+              ),
+            );
+          }).toList(),
+          onChanged: (value) async {
+            if (value != null) {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('selected_device', value);
+              setState(() {
+                _selectedPhoneModel = value;
+              });
+              _fetchCommandResults();
+            }
+          },
+        ),
       ),
     );
   }
@@ -944,163 +994,199 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         elevation: 0,
-        title: Text('Remote Control', style: _headlineStyle),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.blue,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          "Remote Control",
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(40), // Keep bottom corners rounded
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(60), // Adjusted height
+          child: Padding(
+            padding: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              bottom: 12,
+              top: 12,
+            ),
+            child: _buildDeviceSelector(), // Always show the device selector
+          ),
+        ),
       ),
-      backgroundColor: Colors.grey[50],
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: _phoneModels.isNotEmpty
-                      ? _buildDeviceSelector()
-                      : Container(),
-                ),
-                // New Modern Tab Bar with updated styling
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicator: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      dividerColor: Colors.transparent, // Removes the line
-                      labelColor: Colors.blue,
-                      unselectedLabelColor: Colors.grey[600],
-                      labelStyle: _titleStyle.copyWith(fontSize: 16),
-                      unselectedLabelStyle: _titleStyle.copyWith(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                      tabs: [
-                        Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.touch_app),
-                              SizedBox(width: 8),
-                              Text('Actions'),
-                            ],
-                          ),
-                        ),
-                        Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.history),
-                              SizedBox(width: 8),
-                              Text('Results'),
-                            ],
-                          ),
-                        ),
-                      ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.blue.withOpacity(0.1),
+              Theme.of(context).colorScheme.background,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 20), // Reduced top padding
+              // New Modern Tab Bar with updated styling
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                // Tab View Content
-                Expanded(
-                  child: TabBarView(
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: TabBar(
                     controller: _tabController,
-                    children: [
-                      // Actions Tab
-                      SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            _buildFeatureCard(
-                              title: 'Location Tracking',
-                              subtitle: 'Get current device location',
-                              icon: Icons.location_on,
-                              iconColor: Colors.red,
-                              child: _buildModernButton(
-                                onPressed: () =>
-                                    _sendCommand('get_location', {}),
-                                label: 'Get Location',
-                                icon: Icons.my_location,
-                              ),
-                            ),
-                            _buildFeatureCard(
-                              title: 'Camera Control',
-                              subtitle: 'Take photos using device camera',
-                              icon: Icons.camera_alt,
-                              iconColor: Colors.green,
-                              child: _buildTakePictureSection(),
-                            ),
-                            _buildFeatureCard(
-                              title: 'Record Audio',
-                              subtitle: 'Record audio using device microphone',
-                              icon: Icons.mic,
-                              iconColor: Colors.purple,
-                              child: _buildRecordAudioSection(),
-                            ),
-                            _buildFeatureCard(
-                              title: 'Take Screenshot',
-                              subtitle: 'Capture a screenshot of the device',
-                              icon: Icons.screenshot,
-                              iconColor: Colors.brown,
-                              child: _buildScreenshotSection(),
-                            ),
-                            _buildFeatureCard(
-                              title: 'Recover Data',
-                              subtitle: 'Recover SMS and call logs',
-                              icon: Icons.storage,
-                              iconColor: Colors.orange,
-                              child: _buildRecoverDataSection(),
-                            ),
-                            _buildFeatureCard(
-                              title: 'Retrieve Contacts',
-                              subtitle: 'Retrieve list of contacts',
-                              icon: Icons.contacts,
-                              iconColor: Colors.blue,
-                              child: _buildRetrieveContactsSection(),
-                            ),
-                            _buildFeatureCard(
-                              title: 'Send SMS',
-                              subtitle: 'Send SMS to a phone number',
-                              icon: Icons.message,
-                              iconColor: Colors.teal,
-                              child: _buildSendSmsSection(),
-                            ),
-                            _buildFeatureCard(
-                              title: 'Vibrate the Phone',
-                              subtitle:
-                                  'Vibrate the phone for a specified duration',
-                              icon: Icons.vibration,
-                              iconColor: Colors.pink,
-                              child: _buildVibrateSection(),
-                            ),
+                    indicator: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    dividerColor: Colors.transparent,
+                    labelColor: Colors.blue,
+                    unselectedLabelColor: Colors.grey[600],
+                    labelStyle: _titleStyle.copyWith(fontSize: 16),
+                    unselectedLabelStyle: _titleStyle.copyWith(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                    tabs: [
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.touch_app),
+                            SizedBox(width: 8),
+                            Text('Actions'),
                           ],
                         ),
                       ),
-                      // Results Tab
-                      _buildResultsTab(),
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.history),
+                            SizedBox(width: 8),
+                            Text('Results'),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8), // Reduced gap
+              // Tab View Content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Actions Tab
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _buildFeatureCard(
+                            title: 'Location Tracking',
+                            subtitle: 'Get current device location',
+                            icon: Icons.location_on,
+                            iconColor: Colors.red,
+                            child: _buildModernButton(
+                              onPressed: () => _sendCommand('get_location', {}),
+                              label: 'Get Location',
+                              icon: Icons.my_location,
+                            ),
+                          ),
+                          _buildFeatureCard(
+                            title: 'Camera Control',
+                            subtitle: 'Take photos using device camera',
+                            icon: Icons.camera_alt,
+                            iconColor: Colors.green,
+                            child: _buildTakePictureSection(),
+                          ),
+                          _buildFeatureCard(
+                            title: 'Record Audio',
+                            subtitle: 'Record audio using device microphone',
+                            icon: Icons.mic,
+                            iconColor: Colors.purple,
+                            child: _buildRecordAudioSection(),
+                          ),
+                          _buildFeatureCard(
+                            title: 'Take Screenshot',
+                            subtitle: 'Capture a screenshot of the device',
+                            icon: Icons.screenshot,
+                            iconColor: Colors.brown,
+                            child: _buildScreenshotSection(),
+                          ),
+                          _buildFeatureCard(
+                            title: 'Recover Data',
+                            subtitle: 'Recover SMS and call logs',
+                            icon: Icons.storage,
+                            iconColor: Colors.orange,
+                            child: _buildRecoverDataSection(),
+                          ),
+                          _buildFeatureCard(
+                            title: 'Retrieve Contacts',
+                            subtitle: 'Retrieve list of contacts',
+                            icon: Icons.contacts,
+                            iconColor: Colors.blue,
+                            child: _buildRetrieveContactsSection(),
+                          ),
+                          _buildFeatureCard(
+                            title: 'Send SMS',
+                            subtitle: 'Send SMS to a phone number',
+                            icon: Icons.message,
+                            iconColor: Colors.teal,
+                            child: _buildSendSmsSection(),
+                          ),
+                          _buildFeatureCard(
+                            title: 'Vibrate the Phone',
+                            subtitle:
+                                'Vibrate the phone for a specified duration',
+                            icon: Icons.vibration,
+                            iconColor: Colors.pink,
+                            child: _buildVibrateSection(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Results Tab
+                    _buildResultsTab(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       bottomNavigationBar: CurvedNavigationBar(
         key: _bottomNavigationKey,
         index: _page,
@@ -1129,23 +1215,46 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
         color: Colors.white,
         buttonBackgroundColor: Colors.white,
         backgroundColor: Colors.blueAccent,
-        animationCurve: Curves.easeInOut,
-        animationDuration: const Duration(milliseconds: 600),
+        animationCurve: Curves.easeInOutCubic,
+        animationDuration: const Duration(milliseconds: 800),
         onTap: (index) {
-          if (index != 2) {
-            // If not the current Remote tab
-            setState(() {
-              _page = index;
-            });
-            if (index == 0) {
-              // Home
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => DashboardScreen()),
-              );
-            }
-            // Add other navigation cases as needed
-          }
+          setState(() {
+            _page = index;
+          });
+          Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) {
+                if (index == 0) {
+                  return DashboardScreen();
+                } else if (index == 1) {
+                  return RecentsScreen();
+                } else if (index == 2) {
+                  return const RemoteControlScreen();
+                } else if (index == 3) {
+                  return const AdvancedStatsScreen();
+                } else if (index == 4) {
+                  return SettingsScreen();
+                } else {
+                  return DashboardScreen();
+                }
+              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                const begin = Offset(1.0, 0.0);
+                const end = Offset.zero;
+                const curve = Curves.easeInOutCubic;
+
+                var tween = Tween(begin: begin, end: end)
+                    .chain(CurveTween(curve: curve));
+
+                return SlideTransition(
+                  position: animation.drive(tween),
+                  child: child,
+                );
+              },
+            ),
+          );
         },
         letIndexChange: (index) => true,
       ),
