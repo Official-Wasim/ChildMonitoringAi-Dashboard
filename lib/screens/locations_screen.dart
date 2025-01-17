@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import 'package:sticky_headers/sticky_headers/widget.dart';
-import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
-import 'package:shared_preferences/shared_preferences.dart'; // Add this import
+import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LocationInfo {
   final double latitude;
@@ -50,11 +50,12 @@ class _LocationsScreenState extends State<LocationsScreen> {
   String _searchQuery = ""; // Add search query state
   List<LocationInfo> _filteredLocationsList = []; // Add filtered locations list
 
-  static const int _itemsPerPage = 20;
+  static const int _itemsPerPage = 50; // Update to 50 items
   int _currentPage = 0;
   bool _hasMoreData = true;
 
-  final RefreshController _refreshController = RefreshController(initialRefresh: false); // Add this line
+  final RefreshController _refreshController =
+      RefreshController(initialRefresh: false); // Add this line
 
   @override
   void initState() {
@@ -354,7 +355,8 @@ class _LocationsScreenState extends State<LocationsScreen> {
                       hintStyle: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.grey.shade600,
                       ),
-                      prefixIcon: Icon(Icons.search, color: Colors.blue), // Change search icon color
+                      prefixIcon: Icon(Icons.search,
+                          color: Colors.blue), // Change search icon color
                       border: InputBorder.none,
                       contentPadding:
                           EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -394,7 +396,8 @@ class _LocationsScreenState extends State<LocationsScreen> {
                         : SmartRefresher(
                             controller: _refreshController,
                             enablePullDown: true,
-                            onRefresh: () => _fetchLocationsData(isRefresh: true),
+                            onRefresh: () =>
+                                _fetchLocationsData(isRefresh: true),
                             child: _buildLocationsList(),
                           ),
               ),

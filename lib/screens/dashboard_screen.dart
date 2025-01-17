@@ -31,7 +31,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'Select Device'
   ]; // List to store devices with default value
   static const String SELECTED_DEVICE_KEY = 'selected_device';
-  bool _isLoading = true; // Add this line at the top with other variables
+  bool _isLoading = false; // Set to false by default
+  bool _isLoadingData = false;
 
   // Add count variables
   Map<String, int> _counts = {
@@ -122,8 +123,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           // Extended app bar background
           Container(
-            height: MediaQuery.of(context).size.height *
-                0.40, // Increased from 0.45 to 0.48
+            height: MediaQuery.of(context).size.height * 0.40,
             decoration: BoxDecoration(
               color: Colors.blueAccent,
               borderRadius: BorderRadius.only(
@@ -140,305 +140,158 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           // Main content
-          Column(
-            children: [
-              // App Bar with adjusted height
-              Container(
-                height: kToolbarHeight + 30, // Reduced from 40 to 30
-                child: AppBar(
-                  elevation: 0,
-                  backgroundColor: Colors.transparent,
-                  leading: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: CircleAvatar(
-                      radius: 15,
-                      backgroundColor: Colors.white,
-                      child: Text(
-                        'U', // Static initial
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent,
+          RefreshIndicator(
+            onRefresh: () async {
+              await _fetchDevices();
+              if (_selectedDevice != 'Select Device') {
+                await _fetchDeviceData(_selectedDevice);
+              }
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  // App Bar
+                  Container(
+                    height: kToolbarHeight + 30,
+                    child: AppBar(
+                      elevation: 0,
+                      backgroundColor: Colors.transparent,
+                      leading: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: CircleAvatar(
+                          radius: 15,
+                          backgroundColor: Colors.white,
+                          child: Text(
+                            'U', // Static initial
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  title: const Text(
-                    'Dashboard',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  centerTitle: true,
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            constraints: const BoxConstraints(minWidth: 120),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedDevice,
-                                icon: const Icon(Icons.phone_android,
-                                    color: Colors.white),
-                                dropdownColor: Colors.blueAccent,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                onChanged: (String? newValue) async {
-                                  if (newValue != null &&
-                                      newValue != _selectedDevice) {
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    await prefs.setString(
-                                        SELECTED_DEVICE_KEY, newValue);
-                                    setState(() {
-                                      _selectedDevice = newValue;
-                                    });
-                                    _fetchDeviceData(newValue);
-                                  }
-                                },
-                                items: _devices.map<DropdownMenuItem<String>>(
-                                    (String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(
-                                      // Truncate text if longer than 10 characters
-                                      value.length > 10
-                                          ? '${value.substring(0, 10)}...'
-                                          : value,
-                                      style: TextStyle(
-                                        color: value == 'Select Device'
-                                            ? Colors.white70
-                                            : Colors.white,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                      title: const Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      centerTitle: true,
+                      actions: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                constraints:
+                                    const BoxConstraints(minWidth: 120),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _selectedDevice,
+                                    icon: const Icon(Icons.phone_android,
+                                        color: Colors.white),
+                                    dropdownColor: Colors.blueAccent,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                  );
-                                }).toList(),
+                                    onChanged: (String? newValue) async {
+                                      if (newValue != null &&
+                                          newValue != _selectedDevice) {
+                                        final prefs = await SharedPreferences
+                                            .getInstance();
+                                        await prefs.setString(
+                                            SELECTED_DEVICE_KEY, newValue);
+                                        setState(() {
+                                          _selectedDevice = newValue;
+                                        });
+                                        _fetchDeviceData(newValue);
+                                      }
+                                    },
+                                    items: _devices
+                                        .map<DropdownMenuItem<String>>(
+                                            (String value) {
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(
+                                          // Truncate text if longer than 10 characters
+                                          value.length > 10
+                                              ? '${value.substring(0, 10)}...'
+                                              : value,
+                                          style: TextStyle(
+                                            color: value == 'Select Device'
+                                                ? Colors.white70
+                                                : Colors.white,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Dashboard Content
+                  Container(
+                    constraints: BoxConstraints(maxWidth: 800),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Welcome Section
+                        _buildWelcomeSection(),
+
+                        // Status Cards
+                        _buildStatusSection(),
+
+                        // Location Card
+                        _buildLocationCard(context),
+
+                        const SizedBox(height: 30),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: const [
+                            Text(
+                              'Dashboard',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Content
-              Expanded(
-                child: _isLoading
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 8), // Reduced from 12 to 8
-                            Text('Loading dashboard...'),
+                            Text(
+                              'See All',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.blueAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () async {
-                          await _fetchDevices();
-                          if (_selectedDevice != 'Select Device') {
-                            await _fetchDeviceData(_selectedDevice);
-                          }
-                        },
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding:
-                              const EdgeInsets.all(8.0), // Reduced from 12 to 8
-                          child: Container(
-                            constraints: BoxConstraints(maxWidth: 800),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Welcome',
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.white), // Changed to white
-                                ),
-                                const SizedBox(
-                                    height: 4), // Reduced from 6 to 4
-                                Text(
-                                  'Username', // Static username
-                                  style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white), // Changed to white
-                                ),
-                                SizedBox(height: 6), // Reduced from 8 to 6
-                                Row(
-                                  children: [
-                                    Icon(Icons.phone_android,
-                                        size: 16,
-                                        color:
-                                            Colors.white), // Added white color
-                                    SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        _selectedDevice,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color:
-                                              Colors.white, // Changed to white
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(
-                                    height: 8), // Reduced from 12 to 8
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    _buildStatusCard(
-                                        context,
-                                        Icons.signal_cellular_alt,
-                                        'Online Status'),
-                                    _buildStatusCard(context,
-                                        Icons.battery_charging_full, 'Battery'),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                _buildLocationCard(context),
-                                const SizedBox(height: 24),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: const [
-                                    Text(
-                                      'Dashboard',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    Text(
-                                      'See All',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.blueAccent,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2), // Reduced gap
-                                GridView.count(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 6,
-                                  childAspectRatio:
-                                      2.1, // Changed from 1.9 to 2.4 to make cards shorter
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  children: [
-                                    _buildDashboardCard(context, Icons.sms,
-                                        'SMS', _counts['sms'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const SmsHistoryScreen()),
-                                      );
-                                    }),
-                                    _buildDashboardCard(context, Icons.message,
-                                        'MMS', _counts['mms'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const MmsHistoryScreen()),
-                                      );
-                                    }),
-                                    _buildDashboardCard(context, Icons.call,
-                                        'Calls', _counts['calls'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const CallHistoryScreen()),
-                                      );
-                                    }),
-                                    _buildDashboardCard(
-                                        context,
-                                        Icons.location_on,
-                                        'Locations',
-                                        _counts['locations'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const LocationsScreen()),
-                                      );
-                                    }),
-                                    _buildDashboardCard(
-                                        context,
-                                        Icons.contacts,
-                                        'Contacts',
-                                        _counts['contacts'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) => ContactsScreen(
-                                                phoneModel:
-                                                    _selectedDevice)), // Pass selected device
-                                      );
-                                    }),
-                                    _buildDashboardCard(context, Icons.apps,
-                                        'Apps', _counts['apps'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) => AppsScreen(
-                                                phoneModel: _selectedDevice)),
-                                      );
-                                    }),
-                                    _buildDashboardCard(context, Icons.web,
-                                        'Sites', _counts['sites'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                WebVisitHistoryPage(
-                                                  phoneModel: '',
-                                                )),
-                                      );
-                                    }),
-                                    _buildDashboardCard(
-                                        context,
-                                        Icons.chat_bubble,
-                                        '        Instant\n Messaging',
-                                        _counts['messages'] ?? 0, () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                InstantMessagingAppsScreen()),
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+
+                        const SizedBox(height: 2),
+
+                        // Dashboard Grid
+                        _buildDashboardGrid(),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -536,6 +389,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       return;
     }
+
+    setState(() {
+      _isLoadingData = true;
+    });
 
     try {
       final User? user = FirebaseAuth.instance.currentUser;
@@ -642,52 +499,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e, stackTrace) {
       debugPrint('Error fetching device data: $e\n$stackTrace');
       // Optionally show an error message to the user
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingData = false;
+        });
+      }
     }
   }
 
-  Widget _buildStatusCard(BuildContext context, IconData icon, String label) {
-    return Material(
-      elevation: 4,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.45,
-        padding: const EdgeInsets.all(8), // Reduced from 10 to 8
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue.shade100),
+  Widget _buildWelcomeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Welcome',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+            color: Colors.white,
+          ),
         ),
-        child: Column(
+        const SizedBox(height: 4),
+        Text(
+          _username,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        // ...existing welcome section code...
+        const SizedBox(height: 4), // Reduced from 6 to 4
+        Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 10.0),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20.0),
-                      child: Icon(Icons.question_mark,
-                          size: 36, color: Colors.blueAccent),
-                    ),
-                    Icon(icon, size: 36, color: Colors.blueAccent),
-                  ],
+            Icon(Icons.phone_android,
+                size: 16, color: Colors.white), // Added white color
+            SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                _selectedDevice,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white, // Changed to white
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-            ),
-            const SizedBox(height: 8), // Reduced from 10 to 8
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent,
-                  ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 8), // Reduced from 12 to 8
+      ],
+    );
+  }
+
+  Widget _buildStatusSection() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildStatusCard(
+                context, Icons.signal_cellular_alt, 'Online Status'),
+            _buildStatusCard(context, Icons.battery_charging_full, 'Battery'),
+          ],
+        ),
+        const SizedBox(
+            height: 10), // Add padding between status and location card
+      ],
     );
   }
 
@@ -752,11 +633,135 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildDashboardGrid() {
+    return GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 6,
+      childAspectRatio: 2.1,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _buildDashboardCard(context, Icons.sms, 'SMS', _counts['sms'] ?? 0, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SmsHistoryScreen()),
+          );
+        }),
+        _buildDashboardCard(context, Icons.message, 'MMS', _counts['mms'] ?? 0,
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MmsHistoryScreen()),
+          );
+        }),
+        _buildDashboardCard(context, Icons.call, 'Calls', _counts['calls'] ?? 0,
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CallHistoryScreen()),
+          );
+        }),
+        _buildDashboardCard(
+            context, Icons.location_on, 'Locations', _counts['locations'] ?? 0,
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const LocationsScreen()),
+          );
+        }),
+        _buildDashboardCard(
+            context, Icons.contacts, 'Contacts', _counts['contacts'] ?? 0, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => ContactsScreen(
+                    phoneModel: _selectedDevice)), // Pass selected device
+          );
+        }),
+        _buildDashboardCard(context, Icons.apps, 'Apps', _counts['apps'] ?? 0,
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => AppsScreen(phoneModel: _selectedDevice)),
+          );
+        }),
+        _buildDashboardCard(context, Icons.web, 'Sites', _counts['sites'] ?? 0,
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => WebVisitHistoryPage(
+                      phoneModel: _selectedDevice,
+                    )),
+          );
+        }),
+        _buildDashboardCard(context, Icons.chat_bubble,
+            '        Instant\n Messaging', _counts['messages'] ?? 0, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => InstantMessagingAppsScreen()),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildStatusCard(BuildContext context, IconData icon, String label) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.45,
+        padding: const EdgeInsets.all(8), // Reduced from 10 to 8
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue.shade100),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 10.0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20.0),
+                      child: Icon(Icons.question_mark,
+                          size: 36, color: Colors.blueAccent),
+                    ),
+                    Icon(icon, size: 36, color: Colors.blueAccent),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8), // Reduced from 10 to 8
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Update _buildDashboardCard to handle loading state per card
   Widget _buildDashboardCard(BuildContext context, IconData icon, String label,
       int count, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        // ...existing container decoration...
         decoration: BoxDecoration(
           color: Colors.blueAccent.withOpacity(1),
           borderRadius: BorderRadius.circular(12),
@@ -769,7 +774,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(8.0), // Reduced from 12 to 8
+          padding: const EdgeInsets.all(8.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -785,14 +790,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '$count',
-                      style:
-                          Theme.of(context).textTheme.headlineLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                    ),
+                    _isLoadingData
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            '$count',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                          ),
                     Text(
                       label,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(

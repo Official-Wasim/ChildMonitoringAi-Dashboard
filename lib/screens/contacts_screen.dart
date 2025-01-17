@@ -24,7 +24,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   final RefreshController _refreshController =
       RefreshController(initialRefresh: false); // Add this line
 
-  static const int _itemsPerPage = 20;
+  static const int _itemsPerPage = 50;
   int _currentPage = 0;
   bool _hasMoreData = true;
 
@@ -192,13 +192,38 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Widget _buildContactsList() {
-    final groupedContacts = _groupContactsByDate(_getFilteredContacts());
+    final groupedContacts = _groupContactsByDate(_paginatedContacts);
     final theme = Theme.of(context);
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: groupedContacts.length,
+      itemCount: groupedContacts.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index >= groupedContacts.length) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: TextButton(
+                onPressed: _loadMoreData,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Load More',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
         final dateStr = groupedContacts.keys.elementAt(index);
         final contactsForDate = groupedContacts[dateStr]!;
 

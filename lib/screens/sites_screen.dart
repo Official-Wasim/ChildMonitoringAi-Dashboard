@@ -4,11 +4,16 @@ import 'package:intl/intl.dart'; // For formatting time
 import 'package:url_launcher/url_launcher.dart'; // Add this import
 import 'package:sticky_headers/sticky_headers/widget.dart'; // Correct import for StickyHeader
 import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
+import 'package:firebase_auth/firebase_auth.dart'; // Add this import
+import 'package:flutter/services.dart'; // Add this import for clipboard
 
 class WebVisitHistoryPage extends StatefulWidget {
   final String phoneModel; // Add this line
 
-  WebVisitHistoryPage({required this.phoneModel}); // Modify constructor
+  const WebVisitHistoryPage({
+    Key? key,
+    required this.phoneModel,
+  }) : super(key: key);
 
   @override
   _WebVisitHistoryPageState createState() => _WebVisitHistoryPageState();
@@ -16,10 +21,7 @@ class WebVisitHistoryPage extends StatefulWidget {
 
 class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
-  String _userId = ""; // Initialize as empty
-  // Remove the hardcoded phone model
-  // final String _phoneModel = "sdk_gphone64_x86_64"; // Remove this line
-
+  late String _userId;
   Map<String, List<Map<String, dynamic>>> _webVisitHistory = {};
   List<Map<String, dynamic>> _filteredWebVisitHistory = [];
   bool _isLoading = true;
@@ -28,33 +30,49 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
   String _searchQuery = ""; // Add search query state
   bool _hasMoreData = true;
   List<Map<String, dynamic>> _allWebVisits = [];
-  final RefreshController _refreshController = RefreshController(initialRefresh: false); // Add this line
+  final RefreshController _refreshController =
+      RefreshController(initialRefresh: false); // Add this line
 
   @override
   void initState() {
     super.initState();
-    _fetchUserId();
+    _initializeUserId();
   }
 
-  Future<void> _fetchUserId() async {
-    // Replace with actual user ID logic
-    String userId = await getUserIdFromSomeService();
-    setState(() {
-      _userId = userId;
-    });
-    _fetchWebVisitHistory();
-  }
-
-  Future<String> getUserIdFromSomeService() async {
-    // Mock implementation, replace with actual logic
-    return Future.value("rgNHZYmejJd6D9r5nvyjSKknryA3");
+  Future<void> _initializeUserId() async {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      setState(() {
+        _userId = currentUser.uid;
+      });
+      await _fetchWebVisitHistory();
+    } else {
+      // Handle the case when no user is signed in
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No user signed in'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _fetchWebVisitHistory({bool isRefresh = false}) async {
+    if (widget.phoneModel == 'Select Device') {
+      setState(() {
+        _isLoading = false;
+        _allWebVisits = [];
+        _filteredWebVisitHistory = [];
+      });
+      return;
+    }
+
     if (_userId.isEmpty) return;
     try {
       final webVisitSnapshot = await _databaseRef
-          .child('users/$_userId/phones/${widget.phoneModel}/web_visits') // Use widget.phoneModel
+          .child(
+              'users/$_userId/phones/${widget.phoneModel}/web_visits') // Use widget.phoneModel
           .get();
 
       if (webVisitSnapshot.exists) {
@@ -208,6 +226,115 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
     }
   }
 
+  String _truncateUrl(String url, int maxLines) {
+    List<String> lines = url.split('\n');
+    if (lines.length <= maxLines) return url;
+    return '${lines.take(maxLines).join('\n')}...';
+  }
+
+  void _showUrlDialog(BuildContext context, Map<String, dynamic> visit) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          contentPadding:
+              EdgeInsets.only(left: 24, right: 24, bottom: 24, top: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Website Details',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.grey.shade800,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: Colors.grey.shade600),
+                onPressed: () => Navigator.of(context).pop(),
+                padding: EdgeInsets.zero,
+                constraints: BoxConstraints(),
+                splashRadius: 24,
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  visit['url'] ?? 'No URL',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.blue.shade700,
+                    height: 1.5,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  visit['title'] ?? 'No Title',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actionsPadding: EdgeInsets.fromLTRB(24, 0, 24, 16),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(
+                          ClipboardData(text: visit['url'] ?? ''));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('URL copied to clipboard'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 1),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.copy, size: 18),
+                    label: Text('Copy URL'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue.shade700,
+                      side: BorderSide(color: Colors.blue.shade700),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _launchURL(visit['url'] ?? '');
+                    },
+                    icon: Icon(Icons.open_in_new, size: 18),
+                    label: Text('Open Link'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Map<String, List<Map<String, dynamic>>> _groupVisitsByDate(
       List<Map<String, dynamic>> visits) {
     Map<String, List<Map<String, dynamic>>> grouped = {};
@@ -279,25 +406,44 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: InkWell(
-                  onTap: () => _launchURL(visit['url'] ?? ''),
+                  onTap: () => _showUrlDialog(context, visit),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Icon(Icons.link,
                                 color: Colors.blue.shade700, size: 24),
                             SizedBox(width: 12),
                             Expanded(
-                              child: _highlightSearchText(
-                                  visit['url'] ?? 'No URL'),
+                              child: Text(
+                                visit['url'] ?? 'No URL',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      height: 1.5,
+                                    ),
+                              ),
                             ),
                           ],
                         ),
                         Divider(height: 16),
-                        _highlightSearchText(visit['title'] ?? 'No Title'),
+                        Text(
+                          visit['title'] ?? 'No Title',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey.shade700,
+                                    height: 1.4,
+                                  ),
+                        ),
                         SizedBox(height: 8),
                         Row(
                           children: [
@@ -404,8 +550,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
-                            prefixIcon:
-                                Icon(Icons.search, color: Colors.blue),
+                            prefixIcon: Icon(Icons.search, color: Colors.blue),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
@@ -449,7 +594,8 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                         : SmartRefresher(
                             controller: _refreshController,
                             enablePullDown: true,
-                            onRefresh: () => _fetchWebVisitHistory(isRefresh: true),
+                            onRefresh: () =>
+                                _fetchWebVisitHistory(isRefresh: true),
                             child: _buildVisitsList(),
                           ),
               ),
