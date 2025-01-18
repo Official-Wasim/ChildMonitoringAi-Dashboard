@@ -21,7 +21,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   String _searchQuery = ""; // Add search query state
   String _selectedFilter = "all"; // "all", "incoming", "outgoing", "missed"
   bool _isLoading = true; // Add loading state
-  static const int _itemsPerPage = 20;
+  static const int _itemsPerPage = 50; // Update to 50 items
   int _currentPage = 0;
   bool _hasMoreData = true;
   static const String SELECTED_DEVICE_KEY =
@@ -384,13 +384,39 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   }
 
   Widget _buildCallsList() {
-    final groupedCalls = _groupCallsByDate(_filteredCallList);
+    final groupedCalls = _groupCallsByDate(_paginatedCalls); // Use _paginatedList instead of _filteredCallList
     final theme = Theme.of(context);
 
     return ListView.builder(
+      physics: BouncingScrollPhysics(), // Add bouncy physics
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: groupedCalls.length,
+      itemCount: groupedCalls.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index >= groupedCalls.length) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: TextButton(
+                onPressed: _loadMoreData,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Load More',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
         final dateStr = groupedCalls.keys.elementAt(index);
         final callsForDate = groupedCalls[dateStr]!;
 
@@ -456,9 +482,9 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      extendBodyBehindAppBar: true, // Add this line
       appBar: PreferredSize(
-        preferredSize:
-            Size.fromHeight(160), // Adjusted for the search bar height
+        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
             color: Colors.blue,
@@ -494,13 +520,13 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(100),
+              preferredSize: Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
                   right: 16,
-                  bottom: 30,
-                  top: 12,
+                  bottom: 20, // Changed from 30
+                  top: 8, // Changed from 12
                 ),
                 child: Row(
                   children: [

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:sticky_headers/sticky_headers/widget.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LocationInfo {
   final double latitude;
@@ -39,23 +40,17 @@ class LocationsScreen extends StatefulWidget {
 class _LocationsScreenState extends State<LocationsScreen> {
   static const String SELECTED_DEVICE_KEY = 'selected_device';
   String _selectedDevice = '';
-
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
-  List<LocationInfo> locationsList = [];
-  bool isLoading = true;
-
-  final String uniqueUserId = 'rgNHZYmejJd6D9r5nvyjSKknryA3';
-  final String phoneModel = 'sdk_gphone64_x86_64';
-
-  String _searchQuery = ""; // Add search query state
-  List<LocationInfo> _filteredLocationsList = []; // Add filtered locations list
-
-  static const int _itemsPerPage = 50; // Update to 50 items
-  int _currentPage = 0;
-  bool _hasMoreData = true;
-
+  List<LocationInfo> _locationsList = [];
+  List<LocationInfo> _filteredLocationsList = [];
+  String _errorMessage = '';
+  String _searchQuery = '';
+  bool _isLoading = true;
   final RefreshController _refreshController =
-      RefreshController(initialRefresh: false); // Add this line
+      RefreshController(initialRefresh: false);
+  int _currentPage = 0;
+  final int _itemsPerPage = 20;
+  bool _hasMoreData = true;
 
   @override
   void initState() {
@@ -73,79 +68,78 @@ class _LocationsScreenState extends State<LocationsScreen> {
       _fetchLocationsData();
     } else {
       setState(() {
-        isLoading = false;
+        _errorMessage = 'No device selected';
+        _isLoading = false;
       });
     }
   }
 
   Future<void> _fetchLocationsData({bool isRefresh = false}) async {
-    if (_selectedDevice.isEmpty) return;
+    if (_selectedDevice.isEmpty) {
+      setState(() {
+        _errorMessage = 'No device selected';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _errorMessage = 'User is not logged in';
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
-      final DatabaseReference locationRef = _databaseRef
-          .child('users')
-          .child(uniqueUserId)
-          .child('phones')
-          .child(_selectedDevice)
-          .child('location');
+      final locationsSnapshot = await _databaseRef
+          .child('users/${user.uid}/phones/$_selectedDevice/location')
+          .get();
 
-      final DataSnapshot locationsSnapshot = await locationRef.get();
-
-      if (locationsSnapshot.exists && locationsSnapshot.value != null) {
-        final Map<dynamic, dynamic> locationsData =
-            locationsSnapshot.value as Map<dynamic, dynamic>;
+      if (locationsSnapshot.exists) {
+        final Map<String, dynamic> locationsByDate =
+            Map<String, dynamic>.from(locationsSnapshot.value as Map);
 
         final List<LocationInfo> fetchedLocations = [];
 
-        // Iterate through date nodes
-        locationsData.forEach((dateKey, dateData) {
-          if (dateData is Map<dynamic, dynamic>) {
-            // Iterate through timestamp nodes within each date
-            dateData.forEach((timestampKey, locationData) {
-              try {
-                if (locationData is Map<dynamic, dynamic>) {
-                  final location = LocationInfo.fromFirebase(
-                      timestampKey.toString(), locationData);
-                  fetchedLocations.add(location);
-                }
-              } catch (e) {
-                debugPrint(
-                    'Error parsing location data for timestamp $timestampKey: $e');
-              }
-            });
-          } else {
-            // Handle case where the data is directly under the location node
-            try {
-              if (dateData is Map<dynamic, dynamic>) {
-                final location =
-                    LocationInfo.fromFirebase(dateKey.toString(), dateData);
-                fetchedLocations.add(location);
-              }
-            } catch (e) {
-              debugPrint(
-                  'Error parsing location data for timestamp $dateKey: $e');
-            }
-          }
+        locationsByDate.forEach((dateKey, locations) {
+          final Map<String, dynamic> locationEntries =
+              Map<String, dynamic>.from(locations);
+
+          locationEntries.forEach((key, value) {
+            final locationData = Map<String, dynamic>.from(value);
+            fetchedLocations.add(LocationInfo(
+              latitude: (locationData['latitude'] as num).toDouble(),
+              longitude: (locationData['longitude'] as num).toDouble(),
+              timestamp: DateTime.fromMillisecondsSinceEpoch(int.parse(key)),
+              accuracy: (locationData['accuracy'] as num).toDouble(),
+            ));
+          });
         });
 
-        // Sort by timestamp descending (newest first)
         fetchedLocations.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
         setState(() {
-          locationsList = fetchedLocations;
-          _filteredLocationsList = fetchedLocations; // Initialize filtered list
-          isLoading = false;
+          _locationsList = fetchedLocations;
+          _filteredLocationsList = fetchedLocations;
+          _errorMessage = '';
+          _isLoading = false;
         });
       } else {
         setState(() {
-          locationsList = [];
-          _filteredLocationsList = []; // Initialize filtered list
-          isLoading = false;
+          _locationsList = [];
+          _filteredLocationsList = [];
+          _errorMessage = 'No location data found';
+          _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching locations data: $e');
       setState(() {
-        isLoading = false;
+        _errorMessage = 'Error fetching location data: $e';
+        _locationsList = [];
+        _filteredLocationsList = [];
+        _isLoading = false;
       });
     }
     if (isRefresh) {
@@ -153,31 +147,30 @@ class _LocationsScreenState extends State<LocationsScreen> {
     }
   }
 
-  Future<void> _onRefresh() async {
-    setState(() {
-      isLoading = true;
-    });
-    await _fetchLocationsData();
-  }
-
   void _onSearchChanged(String query) {
     setState(() {
       _searchQuery = query;
-      _applyFilters();
+      _filterLocations();
     });
   }
 
-  void _applyFilters() {
+  void _filterLocations() {
     setState(() {
-      _filteredLocationsList = locationsList.where((location) {
-        final searchLower = _searchQuery.toLowerCase();
-        return location.latitude.toString().contains(searchLower) ||
-            location.longitude.toString().contains(searchLower) ||
-            location.timestamp.toString().contains(searchLower);
+      _filteredLocationsList = _locationsList.where((location) {
+        if (_searchQuery.isEmpty) return true;
+        return location.latitude
+                .toString()
+                .contains(_searchQuery.toLowerCase()) ||
+            location.longitude.toString().contains(_searchQuery.toLowerCase());
       }).toList();
-      _currentPage = 0;
-      _hasMoreData = _filteredLocationsList.length > _itemsPerPage;
     });
+  }
+
+  Future<void> _onRefresh() async {
+    setState(() {
+      _isLoading = true;
+    });
+    await _fetchLocationsData();
   }
 
   List<LocationInfo> get _paginatedList {
@@ -215,13 +208,39 @@ class _LocationsScreenState extends State<LocationsScreen> {
   }
 
   Widget _buildLocationsList() {
-    final groupedLocations = _groupLocationsByDate(_filteredLocationsList);
+    final groupedLocations = _groupLocationsByDate(_paginatedList);
     final theme = Theme.of(context);
 
     return ListView.builder(
+      physics: BouncingScrollPhysics(), // Add bouncy physics
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: groupedLocations.length,
+      itemCount: groupedLocations.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index >= groupedLocations.length) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: TextButton(
+                onPressed: _loadMoreData,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Load More',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
         final dateStr = groupedLocations.keys.elementAt(index);
         final locationsForDate = groupedLocations[dateStr]!;
 
@@ -291,7 +310,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(160),
+        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
             color: Colors.blue,
@@ -327,13 +346,13 @@ class _LocationsScreenState extends State<LocationsScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(100),
+              preferredSize: Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
                   right: 16,
-                  bottom: 30,
-                  top: 12,
+                  bottom: 20, // Changed from 30
+                  top: 8, // Changed from 12
                 ),
                 child: Container(
                   decoration: BoxDecoration(
@@ -384,7 +403,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
             children: [
               const SizedBox(height: 16),
               Expanded(
-                child: isLoading
+                child: _isLoading
                     ? Center(child: CircularProgressIndicator())
                     : _filteredLocationsList.isEmpty
                         ? Center(

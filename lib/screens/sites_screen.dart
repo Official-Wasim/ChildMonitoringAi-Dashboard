@@ -25,7 +25,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
   Map<String, List<Map<String, dynamic>>> _webVisitHistory = {};
   List<Map<String, dynamic>> _filteredWebVisitHistory = [];
   bool _isLoading = true;
-  static const int _itemsPerPage = 20; // Changed to 20 items per page
+  static const int _itemsPerPage = 50; // Update to 50 items
   int _currentPage = 0;
   String _searchQuery = ""; // Add search query state
   bool _hasMoreData = true;
@@ -354,12 +354,39 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
   }
 
   Widget _buildVisitsList() {
-    final groupedVisits = _groupVisitsByDate(_filteredWebVisitHistory);
+    final groupedVisits = _groupVisitsByDate(_paginatedList);
+    final theme = Theme.of(context);
 
     return ListView.builder(
+      physics: BouncingScrollPhysics(), // Add bouncy physics
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: groupedVisits.length,
+      itemCount: groupedVisits.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index >= groupedVisits.length) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: TextButton(
+                onPressed: _loadMoreData,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Load More',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
         final dateStr = groupedVisits.keys.elementAt(index);
         final visitsForDate = groupedVisits[dateStr]!;
 
@@ -483,7 +510,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(160),
+        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
             color: Colors.blue,
@@ -519,13 +546,13 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(100),
+              preferredSize: Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
                   right: 16,
-                  bottom: 30,
-                  top: 12,
+                  bottom: 20, // Changed from 30
+                  top: 8, // Changed from 12
                 ),
                 child: Row(
                   children: [
@@ -566,6 +593,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
         ),
       ),
       body: Container(
+        // Remove the top padding that was creating extra space
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -579,7 +607,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 16),
+              // Remove the SizedBox that was adding extra space
               Expanded(
                 child: _isLoading
                     ? Center(child: CircularProgressIndicator())

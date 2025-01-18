@@ -25,7 +25,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _page = 0;
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
-  String _username = 'Wasim'; // Changed to default username
+  String _username = 'User'; // Changed default value
   String _selectedDevice = 'Select Device'; // Default selected device
   List<String> _devices = [
     'Select Device'
@@ -373,7 +373,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _fetchDeviceData(String device) async {
     if (device == 'Select Device') {
       if (mounted) {
-        // Add this check
         setState(() {
           _counts = {
             'sms': 0,
@@ -385,6 +384,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'sites': 0,
             'messages': 0,
           };
+          _username = 'User';
         });
       }
       return;
@@ -400,6 +400,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         DatabaseReference deviceDataRef = FirebaseDatabase.instance
             .reference()
             .child('users/${user.uid}/phones/$device');
+
+        // Fetch username from user-details
+        final DatabaseEvent userDetailsEvent =
+            await deviceDataRef.child('user-details/name').once();
+        if (userDetailsEvent.snapshot.value != null) {
+          if (mounted) {
+            setState(() {
+              _username = userDetailsEvent.snapshot.value.toString();
+            });
+          }
+        }
 
         deviceDataRef.keepSynced(true);
 
@@ -472,19 +483,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             newCounts['sites'] = countNestedData(data['web_visits']);
           }
 
-          // Count instant messages
-          if (data['messages'] is Map) {
+          // Update instant messages counting logic
+          if (data['social_media_messages'] is Map) {
             int messageCount = 0;
-            final messagesData = data['messages'] as Map;
-            for (var app in messagesData.values) {
-              if (app is Map) {
-                for (var chat in app.values) {
-                  if (chat is Map) {
-                    messageCount += chat.length;
+            final messagesData = data['social_media_messages'] as Map;
+            messagesData.forEach((date, platformData) {
+              if (platformData is Map) {
+                platformData.forEach((platform, messages) {
+                  if (messages is Map) {
+                    messageCount += messages.length;
                   }
-                }
+                });
               }
-            }
+            });
             newCounts['messages'] = messageCount;
           }
 
@@ -675,8 +686,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => ContactsScreen(
-                    phoneModel: _selectedDevice)), // Pass selected device
+              builder: (context) => ContactsScreen(phoneModel: _selectedDevice),
+            ),
           );
         }),
         _buildDashboardCard(context, Icons.apps, 'Apps', _counts['apps'] ?? 0,
@@ -702,7 +713,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => InstantMessagingAppsScreen()),
+                builder: (context) =>
+                    InstantMessagingAppsScreen(phoneModel: _selectedDevice)),
           );
         }),
       ],

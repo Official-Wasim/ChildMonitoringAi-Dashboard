@@ -372,13 +372,39 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
   }
 
   Widget _buildSmsList() {
-    final groupedMessages = _groupSmsByDate(_filteredSmsList);
+    final groupedMessages = _groupSmsByDate(_paginatedList);
     final theme = Theme.of(context);
 
     return ListView.builder(
+      physics: BouncingScrollPhysics(), // Add bouncy physics
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: groupedMessages.length,
+      itemCount: groupedMessages.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index >= groupedMessages.length) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: TextButton(
+                onPressed: _loadMoreData,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Load More',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
         final dateStr = groupedMessages.keys.elementAt(index);
         final messagesForDate = groupedMessages[dateStr]!;
 
@@ -455,7 +481,7 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(160),
+        preferredSize: Size.fromHeight(kToolbarHeight + 60),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.blue,
@@ -491,13 +517,13 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(100),
+              preferredSize: Size.fromHeight(80), // Reduced from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
                   right: 16,
-                  bottom: 30,
-                  top: 12,
+                  bottom: 20, // Reduced from 30
+                  top: 8, // Reduced from 12
                 ),
                 child: Row(
                   children: [
@@ -563,7 +589,6 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 16),
               Expanded(
                 child: _isLoading
                     ? Center(child: CircularProgressIndicator())

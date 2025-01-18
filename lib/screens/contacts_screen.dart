@@ -27,6 +27,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   static const int _itemsPerPage = 50;
   int _currentPage = 0;
   bool _hasMoreData = true;
+  bool _isInitialized = false;
 
   List<ContactInfo> get _paginatedContacts {
     final startIndex = 0;
@@ -47,7 +48,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   void initState() {
     super.initState();
-    _getUserId();
+    // Delay data fetching to allow screen transition to complete
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() => _isInitialized = true);
+        _getUserId();
+      }
+    });
   }
 
   // Fetch the current user's UID from Firebase Authentication
@@ -74,89 +81,95 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _fetchContactsData({bool isRefresh = false}) async {
-    if (_userId == null)
-      return; // Ensure user ID is available before fetching data
+    if (!mounted || _userId == null) return;
 
-    try {
-      final contactsSnapshot = await _databaseRef
-          .child(
-              'users/$_userId/phones/${widget.phoneModel}/contacts') // Use widget.phoneModel
-          .get();
-
-      if (contactsSnapshot.exists) {
-        final dynamic contactsData = contactsSnapshot.value;
-
-        final List<ContactInfo> fetchedContacts = [];
-
-        if (contactsData is Map) {
-          contactsData.forEach((key, value) {
-            if (value is Map) {
-              final contactMap = Map<String, dynamic>.from(value);
-
-              // Check for both 'number' and 'phoneNumber' keys
-              final phoneNumber = contactMap['phoneNumber'] ??
-                  contactMap['number'] ??
-                  contactMap['phone'] ??
-                  'Unknown';
-
-              fetchedContacts.add(ContactInfo(
-                name: contactMap['name'] ?? 'Unknown',
-                phoneNumber: phoneNumber,
-                date: DateTime.fromMillisecondsSinceEpoch(
-                        contactMap['creationTime'] ?? 0)
-                    .toString(),
-              ));
-            }
-          });
-        } else if (contactsData is List) {
-          for (var value in contactsData) {
-            if (value is Map) {
-              final contactMap = Map<String, dynamic>.from(value);
-
-              // Check for both 'number' and 'phoneNumber' keys
-              final phoneNumber = contactMap['phoneNumber'] ??
-                  contactMap['number'] ??
-                  contactMap['phone'] ??
-                  'Unknown';
-
-              fetchedContacts.add(ContactInfo(
-                name: contactMap['name'] ?? 'Unknown',
-                phoneNumber: phoneNumber,
-                date: DateTime.fromMillisecondsSinceEpoch(
-                        contactMap['creationTime'] ?? 0)
-                    .toString(),
-              ));
-            }
-          }
-        }
-
-        fetchedContacts.sort((a, b) =>
-            b.date.compareTo(a.date)); // Sort by date in descending order
-
-        setState(() {
-          _contactsList = fetchedContacts;
-          _isLoading = false; // Set loading flag to false after data is fetched
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'No contacts available';
-        });
-      }
-    } catch (e) {
+    if (!isRefresh) {
       setState(() {
-        _isLoading = false;
-        _errorMessage = 'Error fetching data: $e';
+        _isLoading = true;
+        _errorMessage = null;
       });
     }
-    if (isRefresh) {
-      _refreshController.refreshCompleted();
+
+    try {
+      final DatabaseReference contactsRef = _databaseRef
+          .child('users')
+          .child(_userId!)
+          .child('phones')
+          .child(widget.phoneModel)
+          .child('contacts');
+
+      final DatabaseEvent event = await contactsRef.once();
+
+      if (!mounted) return;
+
+      if (!event.snapshot.exists) {
+        setState(() {
+          _contactsList = [];
+          _errorMessage = 'No contacts available';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final dynamic contactsData = event.snapshot.value;
+      final List<ContactInfo> fetchedContacts = [];
+
+      if (contactsData is Map) {
+        contactsData.forEach((key, value) {
+          if (value is Map) {
+            try {
+              final contactMap = Map<String, dynamic>.from(value);
+              final phoneNumber = contactMap['phoneNumber'] ??
+                  contactMap['number'] ??
+                  contactMap['phone'] ??
+                  'Unknown';
+
+              final creationTime = contactMap['creationTime'] ??
+                  DateTime.now().millisecondsSinceEpoch;
+
+              fetchedContacts.add(ContactInfo(
+                name: contactMap['name']?.toString() ?? 'Unknown',
+                phoneNumber: phoneNumber.toString(),
+                date: DateTime.fromMillisecondsSinceEpoch(
+                        creationTime is int ? creationTime : 0)
+                    .toString(),
+              ));
+            } catch (e) {
+              debugPrint('Error parsing contact: $e');
+            }
+          }
+        });
+      }
+
+      if (!mounted) return;
+
+      // Sort contacts by date in descending order
+      fetchedContacts.sort((a, b) => b.date.compareTo(a.date));
+
+      setState(() {
+        _contactsList = fetchedContacts;
+        _isLoading = false;
+        _errorMessage = _contactsList.isEmpty ? 'No contacts found' : null;
+      });
+    } catch (e) {
+      debugPrint('Error fetching contacts: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error loading contacts: ${e.toString()}';
+      });
+    } finally {
+      if (isRefresh && mounted) {
+        _refreshController.refreshCompleted();
+      }
     }
   }
 
   void _onSearchChanged(String query) {
     setState(() {
       _searchQuery = query;
+      _currentPage = 0; // Reset pagination when search changes
+      _hasMoreData = true;
     });
   }
 
@@ -197,7 +210,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      physics: const BouncingScrollPhysics(), // Add smooth scrolling physics
       itemCount: groupedContacts.length + (_hasMoreData ? 1 : 0),
+      addAutomaticKeepAlives: false, // Optimize memory usage
+      addRepaintBoundaries: false, // Optimize rendering
       itemBuilder: (context, index) {
         if (index >= groupedContacts.length) {
           return Padding(
@@ -289,10 +305,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (!_isInitialized) {
+      return Scaffold(
+        body: Container(
+          color: Theme.of(context).scaffoldBackgroundColor,
+        ),
+      );
+    }
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(160),
+        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
             color: Colors.blue,
@@ -328,13 +351,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(100),
+              preferredSize: Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
                   right: 16,
-                  bottom: 30,
-                  top: 12,
+                  bottom: 20, // Changed from 30
+                  top: 8, // Changed from 12
                 ),
                 child: Container(
                   decoration: BoxDecoration(
@@ -381,32 +404,71 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ],
           ),
         ),
-        child: SafeArea(
+        child: SafeArea(  // Wrap with SafeArea
           child: Column(
             children: [
               const SizedBox(height: 16),
               Expanded(
-                child: _isLoading
-                    ? Center(child: CircularProgressIndicator())
-                    : _getFilteredContacts().isEmpty
-                        ? Center(
-                            child: Text(
-                              'No contacts found matching "$_searchQuery".',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          )
-                        : SmartRefresher(
-                            controller: _refreshController,
-                            enablePullDown: true,
-                            onRefresh: () =>
-                                _fetchContactsData(isRefresh: true),
-                            child: _buildContactsList(),
-                          ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildContent(),
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading contacts...'),
+          ],
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red),
+            SizedBox(height: 16),
+            Text(_errorMessage!),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _fetchContactsData(),
+              child: Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_getFilteredContacts().isEmpty) {
+      return Center(
+        child: Text(
+          _searchQuery.isEmpty
+              ? 'No contacts available'
+              : 'No contacts found matching "$_searchQuery".',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      );
+    }
+
+    return SmartRefresher(
+      controller: _refreshController,
+      enablePullDown: true,
+      onRefresh: () => _fetchContactsData(isRefresh: true),
+      child: _buildContactsList(),
     );
   }
 

@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
         '/AuthScreen': (context) => AuthScreen(), // Define the route
         '/DashboardScreen': (context) => DashboardScreen(),
         '/InstantMessagingAppsScreen': (context) =>
-            InstantMessagingAppsScreen(), // Define the route
+            InstantMessagingAppsScreen(phoneModel: 'Unknown'), // Define the route
       },
     );
   }

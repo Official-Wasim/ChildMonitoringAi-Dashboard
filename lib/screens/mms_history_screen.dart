@@ -15,7 +15,8 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
   String _errorMessage = '';
   String _searchQuery = ""; // Add search query state
   String _selectedFilter = "all"; // "all", "incoming", "outgoing"
-  final RefreshController _refreshController = RefreshController(initialRefresh: false); // Add this line
+  final RefreshController _refreshController =
+      RefreshController(initialRefresh: false); // Add this line
 
   static const int _itemsPerPage = 20;
   int _currentPage = 0;
@@ -251,10 +252,61 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
         dateTime.day == yesterday.day;
   }
 
+  Map<String, List<MmsInfo>> _groupMmsByDate(List<MmsInfo> messages) {
+    final Map<String, List<MmsInfo>> grouped = {};
+    for (var message in messages) {
+      final date = _getFormattedDate(message.timestamp);
+      if (!grouped.containsKey(date)) {
+        grouped[date] = [];
+      }
+      grouped[date]!.add(message);
+    }
+    return grouped;
+  }
+
   @override
   void dispose() {
     _refreshController.dispose();
     super.dispose();
+  }
+
+  Widget _buildMmsList() {
+    final groupedMessages = _groupMmsByDate(_paginatedMms);
+    final theme = Theme.of(context);
+
+    return ListView.builder(
+      physics: BouncingScrollPhysics(), // Add bouncy physics
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: groupedMessages.length + (_hasMoreData ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= groupedMessages.length) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: TextButton(
+                onPressed: _loadMoreData,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Load More',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        // ...existing code...
+      },
+    );
   }
 
   @override
@@ -263,8 +315,7 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true, // Add this line
       appBar: PreferredSize(
-        preferredSize:
-            Size.fromHeight(160), // Adjusted for the search bar height
+        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
             color: Colors.blue,
@@ -300,13 +351,13 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(100),
+              preferredSize: Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
                   right: 16,
-                  bottom: 30,
-                  top: 12,
+                  bottom: 20, // Changed from 30
+                  top: 8, // Changed from 12
                 ),
                 child: Row(
                   children: [
@@ -331,8 +382,7 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
-                            prefixIcon:
-                                Icon(Icons.search, color: Colors.blue),
+                            prefixIcon: Icon(Icons.search, color: Colors.blue),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
@@ -373,14 +423,6 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'Showing ${_paginatedMms.length} of ${_filteredMmsList.length} MMS',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
               Expanded(
                 child: _filteredMmsList.isEmpty
                     ? Center(
@@ -395,31 +437,7 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
                         controller: _refreshController,
                         enablePullDown: true,
                         onRefresh: () => _fetchMmsData(isRefresh: true),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          itemCount:
-                              _paginatedMms.length + (_hasMoreData ? 1 : 0),
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            if (index >= _paginatedMms.length) {
-                              return Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Center(
-                                  child: ElevatedButton(
-                                    onPressed: _loadMoreData,
-                                    child: const Text('Load More'),
-                                  ),
-                                ),
-                              );
-                            }
-                            final mms = _paginatedMms[index];
-                            return MmsHistoryTile(
-                                mms: mms,
-                                formattedDate: _getFormattedDate(mms.timestamp));
-                          },
-                        ),
+                        child: _buildMmsList(),
                       ),
               ),
             ],

@@ -2,51 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:sticky_headers/sticky_headers/widget.dart'; // Add this import at the top
+import 'package:sticky_headers/sticky_headers.dart';
 
-class InstagramMessagesScreen extends StatefulWidget {
+class SnapchatMessageScreen extends StatefulWidget {
   final String phoneModel;
-  
-  const InstagramMessagesScreen({Key? key, required this.phoneModel}) : super(key: key);
 
+  const SnapchatMessageScreen({Key? key, required this.phoneModel})
+      : super(key: key);
   @override
-  _InstagramMessagesScreenState createState() =>
-      _InstagramMessagesScreenState();
+  _SnapchatMessageScreenState createState() => _SnapchatMessageScreenState();
 }
 
-class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
+class _SnapchatMessageScreenState extends State<SnapchatMessageScreen> {
   late DatabaseReference _messagesRef;
 
   late Stream<DatabaseEvent> _messagesStream;
   List<Message> _messages = [];
   List<Message> _filteredMessages = [];
   bool _isLoading = false;
-  int _pageSize = 30; // Set to 30 messages per page
+  int _pageSize = 30;
   int _currentPage = 0;
   int _totalMessages = 0;
-  String _searchQuery = ""; // Add search query state
-  String _selectedFilter = "all"; // Add this with other state variables
-
+  String _searchQuery = "";
   static const int _itemsPerPage = 20;
   bool _hasMoreData = true;
-
-  List<Message> get _paginatedList {
-    final startIndex = 0;
-    final endIndex = (_currentPage + 1) * _itemsPerPage;
-    if (startIndex >= _filteredMessages.length) return [];
-    return _filteredMessages.sublist(
-        startIndex, endIndex.clamp(0, _filteredMessages.length));
-  }
-
-  void _loadMoreData() {
-    if (_hasMoreData) {
-      setState(() {
-        _currentPage++;
-        _applyFilters(); // Apply filters when loading more data
-        _hasMoreData = (_currentPage + 1) * _itemsPerPage < _filteredMessages.length;
-      });
-    }
-  }
+  String _selectedFilter = "all"; // Add this with other state variables
 
   @override
   void initState() {
@@ -56,7 +36,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
       _messagesRef = FirebaseDatabase.instance.ref(
           'users/${user.uid}/phones/${widget.phoneModel}/social_media_messages');
     }
-    _messagesStream = _messagesRef.onValue; // Listening for changes
+    _messagesStream = _messagesRef.onValue;
     _loadTotalMessages();
     _loadMoreMessages();
   }
@@ -84,15 +64,14 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
       final messagesMap = snapshot.value as Map<dynamic, dynamic>;
       int totalMessages = 0;
 
-      // Count all Instagram messages across all dates
       messagesMap.forEach((date, dateData) {
         if (dateData is Map) {
           final dateMessages = dateData as Map<dynamic, dynamic>;
-          if (dateMessages.containsKey('instagram') &&
-              dateMessages['instagram'] is Map) {
-            final instagramMessages =
-                dateMessages['instagram'] as Map<dynamic, dynamic>;
-            totalMessages += instagramMessages.length;
+          if (dateMessages.containsKey('snapchat') &&
+              dateMessages['snapchat'] is Map) {
+            final snapchatMessages =
+                dateMessages['snapchat'] as Map<dynamic, dynamic>;
+            totalMessages += snapchatMessages.length;
           }
         }
       });
@@ -115,7 +94,8 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
     });
 
     try {
-      final snapshot = await _messagesRef.limitToLast((_currentPage + 1) * _pageSize).get();
+      final snapshot =
+          await _messagesRef.limitToLast((_currentPage + 1) * _pageSize).get();
       if (snapshot.value == null) {
         setState(() {
           _isLoading = false;
@@ -129,8 +109,10 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
       messagesMap.forEach((date, dateData) {
         if (dateData is Map) {
           final dateMessages = dateData as Map<dynamic, dynamic>;
-          if (dateMessages.containsKey('instagram') && dateMessages['instagram'] is Map) {
-            final platformMessages = dateMessages['instagram'] as Map<dynamic, dynamic>;
+          if (dateMessages.containsKey('snapchat') &&
+              dateMessages['snapchat'] is Map) {
+            final platformMessages =
+                dateMessages['snapchat'] as Map<dynamic, dynamic>;
             platformMessages.forEach((id, messageInfo) {
               if (messageInfo is Map) {
                 final message = Message(
@@ -139,7 +121,8 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                   sender: messageInfo['direction'] == 'incoming'
                       ? messageInfo['sender']?.toString() ?? 'Unknown'
                       : messageInfo['receiver']?.toString() ?? 'Unknown',
-                  timestamp: formatTimestamp(messageInfo['timestamp']?.toString() ?? '0'),
+                  timestamp: formatTimestamp(
+                      messageInfo['timestamp']?.toString() ?? '0'),
                   messageType: messageInfo['direction'] == 'incoming'
                       ? 'Incoming'
                       : 'Outgoing',
@@ -175,27 +158,23 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
   }
 
   void _applyFilters() {
-    setState(() {
-      _filteredMessages = _messages.where((message) {
-        bool matchesFilter = true;
-        if (_selectedFilter == "incoming") {
-          matchesFilter = message.direction == 'incoming';
-        } else if (_selectedFilter == "outgoing") {
-          matchesFilter = message.direction == 'outgoing';
-        }
+    _filteredMessages = _messages.where((message) {
+      bool matchesFilter = true;
+      if (_selectedFilter == "incoming") {
+        matchesFilter = message.direction == 'incoming';
+      } else if (_selectedFilter == "outgoing") {
+        matchesFilter = message.direction == 'outgoing';
+      }
 
-        if (_searchQuery.isEmpty) {
-          return matchesFilter;
-        }
-        return matchesFilter &&
-            (message.sender
-                    .toLowerCase()
-                    .contains(_searchQuery.toLowerCase()) ||
-                message.message
-                    .toLowerCase()
-                    .contains(_searchQuery.toLowerCase()));
-      }).toList();
-    });
+      if (_searchQuery.isEmpty) {
+        return matchesFilter;
+      }
+      return matchesFilter &&
+          (message.sender.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              message.message
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()));
+    }).toList();
   }
 
   void _showFilterDialog() {
@@ -227,10 +206,10 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                     Container(
                       padding: EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.pink.withOpacity(0.1),
+                        color: Colors.yellow[700]!.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.filter_list, color: Colors.pink),
+                      child: Icon(Icons.filter_list, color: Colors.yellow[700]),
                     ),
                     SizedBox(width: 12),
                     Text(
@@ -267,12 +246,12 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: _selectedFilter == filter
-                                ? Colors.pink.withOpacity(0.1)
+                                ? Colors.yellow[700]!.withOpacity(0.1)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: _selectedFilter == filter
-                                  ? Colors.pink
+                                  ? Colors.yellow[700]!
                                   : Colors.grey.withOpacity(0.2),
                               width: 1,
                             ),
@@ -286,7 +265,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                                         ? Icons.call_made
                                         : Icons.all_inclusive,
                                 color: _selectedFilter == filter
-                                    ? Colors.pink
+                                    ? Colors.yellow[700]
                                     : Colors.grey,
                                 size: 20,
                               ),
@@ -295,7 +274,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                                 title,
                                 style: TextStyle(
                                   color: _selectedFilter == filter
-                                      ? Colors.pink
+                                      ? Colors.yellow[700]
                                       : Colors.black87,
                                   fontWeight: _selectedFilter == filter
                                       ? FontWeight.w600
@@ -306,7 +285,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                               if (_selectedFilter == filter)
                                 Icon(
                                   Icons.check_circle,
-                                  color: Colors.pink,
+                                  color: Colors.yellow[700],
                                   size: 20,
                                 ),
                             ],
@@ -319,20 +298,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                 SizedBox(height: 12),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    backgroundColor: Colors.pink.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Close',
-                    style: TextStyle(
-                      color: Colors.pink,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: Text('Close'),
                 ),
               ],
             ),
@@ -342,30 +308,175 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
     );
   }
 
+  List<Message> get _paginatedList {
+    final startIndex = 0;
+    final endIndex = (_currentPage + 1) * _itemsPerPage;
+    if (startIndex >= _filteredMessages.length) return [];
+    return _filteredMessages.sublist(
+        startIndex, endIndex.clamp(0, _filteredMessages.length));
+  }
+
+  void _loadMoreData() {
+    if (_hasMoreData) {
+      setState(() {
+        _currentPage++;
+        _applyFilters(); // Apply filters when loading more data
+        _hasMoreData =
+            (_currentPage + 1) * _itemsPerPage < _filteredMessages.length;
+      });
+    }
+  }
+
   String formatTimestamp(String timestamp) {
     final dateTime = DateTime.fromMillisecondsSinceEpoch(int.parse(timestamp));
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(dateTime);
   }
 
-  Map<String, List<Message>> _groupMessagesByDate(List<Message> messages) {
-    Map<String, List<Message>> grouped = {};
-    for (var message in messages) {
-      final dateStr =
-          DateFormat('dd MMM yyyy').format(DateTime.parse(message.timestamp));
-      grouped.putIfAbsent(dateStr, () => []);
-      grouped[dateStr]!.add(message);
-    }
-    return Map.fromEntries(grouped.entries.toList()
-      ..sort((a, b) => DateFormat('dd MMM yyyy')
-          .parse(b.key)
-          .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight + 60),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.yellow[700],
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.black87,
+                size: 22,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text(
+              "Snapchat Messages",
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: Colors.white, // Changed to white
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(60),
+              child: Container(
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  top: 8,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: TextField(
+                          onChanged: _onSearchChanged,
+                          style: theme.textTheme.bodyMedium,
+                          decoration: InputDecoration(
+                            hintText: 'Search Snapchat messages...',
+                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                            prefixIcon:
+                                Icon(Icons.search, color: Colors.yellow[700]),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.filter_list,
+                            color: Colors.white), // Changed to white
+                        onPressed:
+                            _showFilterDialog, // Updated to use _showFilterDialog
+                        tooltip: "Filter Messages",
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.yellow.withOpacity(0.1),
+              Theme.of(context).colorScheme.background,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _refreshMessages,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (ScrollNotification scrollInfo) {
+                      if (!_isLoading &&
+                          scrollInfo.metrics.pixels ==
+                              scrollInfo.metrics.maxScrollExtent) {
+                        _loadMoreMessages();
+                      }
+                      return false;
+                    },
+                    child: _buildMessagesList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildMessagesList() {
     if (_isLoading && _messages.isEmpty) {
       return Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.pink),
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow[700]!),
         ),
       );
     }
@@ -375,10 +486,10 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.camera_alt_outlined, size: 64, color: Colors.grey),
+            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text(
-              'No Instagram messages found',
+              'No Snapchat messages found',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
@@ -426,7 +537,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                 onPressed: _loadMoreData,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  backgroundColor: Colors.pink.withOpacity(0.1),
+                  backgroundColor: Colors.yellow[700]!.withOpacity(0.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -434,7 +545,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                 child: Text(
                   'Load More',
                   style: TextStyle(
-                    color: Colors.pink,
+                    color: Colors.yellow[900],
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -457,15 +568,12 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.pink,
-                        Colors.pink.withOpacity(0.8),
-                      ],
+                      colors: [Colors.yellow[700]!, Colors.yellow[600]!],
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.pink.withOpacity(0.2),
+                        color: Colors.yellow.withOpacity(0.2),
                         blurRadius: 4,
                         offset: Offset(0, 2),
                       ),
@@ -474,7 +582,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                   child: Text(
                     dateStr,
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: Colors.white,
+                      color: Colors.black87,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
@@ -484,7 +592,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                 Text(
                   '${messagesForDate.length} messages',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.pink,
+                    color: Colors.yellow[900],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -495,21 +603,16 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
             children: messagesForDate
                 .map((message) => Card(
                       elevation: 4,
-                      margin: EdgeInsets.symmetric(
-                          vertical: 4,
-                          horizontal: 0), // Reduced vertical margin from 8 to 4
+                      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 0),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       color: message.direction == 'incoming'
-                          ? Colors.purple.shade50
+                          ? Colors.yellow.shade50
                           : Colors.blue.shade50,
                       child: ListTile(
                         contentPadding: EdgeInsets.only(
-                            left: 6,
-                            right: 6,
-                            top: 6,
-                            bottom: 6), // Modified padding
+                            left: 6, right: 6, top: 6, bottom: 6),
                         leading: Container(
                           padding: EdgeInsets.only(left: 8),
                           child: Icon(
@@ -517,7 +620,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                                 ? Icons.arrow_downward
                                 : Icons.arrow_upward,
                             color: message.direction == 'incoming'
-                                ? Colors.purple
+                                ? Colors.yellow[900]
                                 : Colors.blue,
                           ),
                         ),
@@ -525,7 +628,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                           message.sender,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 16, // Adjusted font size
+                            fontSize: 16,
                           ),
                         ),
                         subtitle: Column(
@@ -533,7 +636,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                           children: [
                             Text(
                               message.message,
-                              maxLines: 5, // Changed from 2 to 2
+                              maxLines: 5, // Changed from 3 to 2
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 14,
@@ -543,8 +646,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                             SizedBox(height: 4),
                             Container(
                               padding: EdgeInsets.symmetric(
-                                  vertical: 2,
-                                  horizontal: 4), // Adjusted padding
+                                  vertical: 2, horizontal: 4),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(8),
@@ -552,7 +654,7 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
                               child: Text(
                                 message.timestamp,
                                 style: TextStyle(
-                                  fontSize: 12, // Adjusted font size
+                                  fontSize: 12,
                                   color: Colors.grey[800],
                                 ),
                               ),
@@ -587,141 +689,18 @@ class _InstagramMessagesScreenState extends State<InstagramMessagesScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Reduced from 100
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.pink,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(40),
-              bottomRight: Radius.circular(40),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: AppBar(
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            leading: IconButton(
-              icon: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: Text(
-              "Instagram Messages",
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-            bottom: PreferredSize(
-              preferredSize: Size.fromHeight(60), // Reduced from 100
-              child: Container(
-                padding: const EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  bottom: 16, // Reduced from 30
-                  top: 8, // Reduced from 12
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          onChanged: _onSearchChanged,
-                          style: theme.textTheme.bodyMedium,
-                          decoration: InputDecoration(
-                            hintText: 'Search Instagram messages...',
-                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey.shade600,
-                            ),
-                            prefixIcon: Icon(Icons.search, color: Colors.pink),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: IconButton(
-                        icon: Icon(Icons.filter_list, color: Colors.white),
-                        onPressed: _showFilterDialog,
-                        tooltip: "Filter Messages",
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.pink.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _refreshMessages,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (ScrollNotification scrollInfo) {
-                      if (!_isLoading &&
-                          scrollInfo.metrics.pixels ==
-                              scrollInfo.metrics.maxScrollExtent) {
-                        _loadMoreMessages();
-                      }
-                      return false;
-                    },
-                    child: _buildMessagesList(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Map<String, List<Message>> _groupMessagesByDate(List<Message> messages) {
+    Map<String, List<Message>> grouped = {};
+    for (var message in messages) {
+      final dateStr =
+          DateFormat('dd MMM yyyy').format(DateTime.parse(message.timestamp));
+      grouped.putIfAbsent(dateStr, () => []);
+      grouped[dateStr]!.add(message);
+    }
+    return Map.fromEntries(grouped.entries.toList()
+      ..sort((a, b) => DateFormat('dd MMM yyyy')
+          .parse(b.key)
+          .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
   }
 }
 

@@ -25,8 +25,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
   List<String> _phoneModels = [];
   bool _isLoading = true;
   String? _selectedDataCount = '15'; // Default number of records
-  String camera = 'rear'; // Move camera variable here
-  bool useFlash = false; // Move useFlash variable here
+  String camera = 'rear'; // Default camera mode
+  bool useFlash = false; // Default flash usage
   String? _selectedVibrateDuration = '5'; // Default vibrate duration
   String? _selectedAudioDuration = '2'; // Default audio recording duration
 

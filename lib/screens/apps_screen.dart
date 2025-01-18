@@ -3,12 +3,13 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:sticky_headers/sticky_headers/widget.dart';
 
 class AppsScreen extends StatefulWidget {
   final String? phoneModel;
 
   const AppsScreen({Key? key, this.phoneModel}) : super(key: key);
-  
+
   @override
   _AppsScreenState createState() => _AppsScreenState();
 }
@@ -330,13 +331,32 @@ class _AppsScreenState extends State<AppsScreen> {
     super.dispose();
   }
 
+  Map<String, List<Map<String, dynamic>>> _groupAppsByDate(
+      List<Map<String, dynamic>> apps) {
+    Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (var app in apps) {
+      final dateStr = DateFormat('dd MMM yyyy').format(
+        DateTime.fromMillisecondsSinceEpoch(app['timestamp'] ?? 0),
+      );
+      grouped.putIfAbsent(dateStr, () => []);
+      grouped[dateStr]!.add(app);
+    }
+    return Map.fromEntries(grouped.entries.toList()
+      ..sort((a, b) => DateFormat('dd MMM yyyy')
+          .parse(b.key)
+          .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
+  }
+
   Widget _buildAppsList() {
+    final groupedApps = _groupAppsByDate(_paginatedApps);
+    final theme = Theme.of(context);
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       physics: const BouncingScrollPhysics(),
-      itemCount: _paginatedApps.length + (_hasMoreData ? 1 : 0),
+      itemCount: groupedApps.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index >= _paginatedApps.length) {
+        if (index >= groupedApps.length) {
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: Center(
@@ -361,114 +381,162 @@ class _AppsScreenState extends State<AppsScreen> {
           );
         }
 
-        var app = _paginatedApps[index];
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).shadowColor.withOpacity(0.1),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+        final dateStr = groupedApps.keys.elementAt(index);
+        final appsForDate = groupedApps[dateStr]!;
+
+        return StickyHeader(
+          header: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 Container(
-                  width: 52,
-                  height: 52,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
                       colors: [
-                        app['status'] == 'installed'
-                            ? Colors.green.withOpacity(0.3)
-                            : Colors.red.withOpacity(0.3),
-                        app['status'] == 'installed'
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.red.withOpacity(0.1),
+                        Colors.blue,
+                        Colors.blue.withOpacity(0.8),
                       ],
                     ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.apps,
-                    color: app['status'] == 'installed'
-                        ? Colors.green
-                        : Colors.red,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        app['appName'] ?? 'Unknown App',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        app['packageName'] ?? 'Unknown Package',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withOpacity(0.7),
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 14,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .secondary
-                                .withOpacity(0.7),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'v${app['version']} • ${app['size']} KB',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary
-                                          .withOpacity(0.7),
-                                    ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatTimestamp(app['timestamp']),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .secondary
-                                  .withOpacity(0.7),
-                            ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
                       ),
                     ],
+                  ),
+                  child: Text(
+                    dateStr,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${appsForDate.length} apps',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
+          ),
+          content: Column(
+            children: appsForDate.map((app) {
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).shadowColor.withOpacity(0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              app['status'] == 'installed'
+                                  ? Colors.green.withOpacity(0.3)
+                                  : Colors.red.withOpacity(0.3),
+                              app['status'] == 'installed'
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.red.withOpacity(0.1),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.apps,
+                          color: app['status'] == 'installed'
+                              ? Colors.green
+                              : Colors.red,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              app['appName'] ?? 'Unknown App',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              app['packageName'] ?? 'Unknown Package',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.7),
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 14,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondary
+                                      .withOpacity(0.7),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'v${app['version']} • ${app['size']} KB',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary
+                                            .withOpacity(0.7),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         );
       },
@@ -481,8 +549,7 @@ class _AppsScreenState extends State<AppsScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize:
-            Size.fromHeight(160), // Adjusted for the search bar height
+        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
             color: Colors.blue,
@@ -518,13 +585,13 @@ class _AppsScreenState extends State<AppsScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(100),
+              preferredSize: Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
                   right: 16,
-                  bottom: 30,
-                  top: 12,
+                  bottom: 20, // Changed from 30
+                  top: 8, // Changed from 12
                 ),
                 child: Row(
                   children: [
@@ -549,8 +616,7 @@ class _AppsScreenState extends State<AppsScreen> {
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
-                            prefixIcon:
-                                Icon(Icons.search, color: Colors.blue),
+                            prefixIcon: Icon(Icons.search, color: Colors.blue),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
@@ -578,8 +644,6 @@ class _AppsScreenState extends State<AppsScreen> {
         ),
       ),
       body: Container(
-        padding:
-            const EdgeInsets.only(top: 160), // Add padding to avoid overlap
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -590,51 +654,44 @@ class _AppsScreenState extends State<AppsScreen> {
             ],
           ),
         ),
-        child: _isLoading
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text("Fetching apps data..."),
-                  ],
-                ),
-              )
-            : _filteredApps.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        'No apps found matching "$_searchQuery".',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          'Found ${_filteredApps.length} apps',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+        child: SafeArea(  // Wrap with SafeArea
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : _filteredApps.isEmpty
+                    ? Center(
+                        child: Text('No apps found matching "$_searchQuery".',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      )
+                    : Expanded(
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Text('Found ${_filteredApps.length} apps',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: SmartRefresher(
+                                controller: _refreshController,
+                                enablePullDown: true,
+                                onRefresh: () => _fetchAppsData(isRefresh: true),
+                                child: _buildAppsList(),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Expanded(
-                        child: SmartRefresher(
-                          controller: _refreshController,
-                          enablePullDown: true,
-                          onRefresh: () => _fetchAppsData(isRefresh: true),
-                          child: _buildAppsList(),
-                        ),
-                      ),
-                    ],
-                  ),
+            ],
+          ),
+        ),
       ),
     );
   }
