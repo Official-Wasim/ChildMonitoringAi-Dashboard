@@ -27,7 +27,8 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   static const String SELECTED_DEVICE_KEY =
       'selected_device'; // Add this constant
   String _selectedDevice = ''; // Add this variable
-  final RefreshController _refreshController = RefreshController(initialRefresh: false); // Add this line
+  final RefreshController _refreshController =
+      RefreshController(initialRefresh: false); // Add this line
 
   List<CallInfo> get _paginatedCalls {
     final startIndex = 0;
@@ -123,6 +124,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                       ? callMap['duration']
                       : int.tryParse(callMap['duration'].toString()) ??
                           0), // Ensure duration is an integer
+              contactName: callMap['contactName'] ?? '', // Add this line
             ));
           });
         });
@@ -181,12 +183,12 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
 
   CallType _getCallType(String type) {
     switch (type) {
-      case '1': // Missed call
-        return CallType.missed;
+      case '1': // Incoming call
+        return CallType.incoming;
       case '2': // Outgoing call
         return CallType.outgoing;
-      case '3': // Incoming call
-        return CallType.incoming;
+      case '3': // Missed call
+        return CallType.missed;
       default:
         return CallType.unknown;
     }
@@ -384,7 +386,8 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   }
 
   Widget _buildCallsList() {
-    final groupedCalls = _groupCallsByDate(_paginatedCalls); // Use _paginatedList instead of _filteredCallList
+    final groupedCalls = _groupCallsByDate(
+        _paginatedCalls); // Use _paginatedList instead of _filteredCallList
     final theme = Theme.of(context);
 
     return ListView.builder(
@@ -551,8 +554,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
-                            prefixIcon:
-                                Icon(Icons.search, color: Colors.blue),
+                            prefixIcon: Icon(Icons.search, color: Colors.blue),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
@@ -639,6 +641,7 @@ class CallInfo {
   final DateTime timestamp;
   final CallType type;
   final Duration? duration;
+  final String contactName; // Add this field
 
   CallInfo({
     required this.name,
@@ -646,6 +649,7 @@ class CallInfo {
     required this.timestamp,
     required this.type,
     this.duration,
+    this.contactName = '', // Add default value
   });
 }
 
@@ -701,7 +705,9 @@ class CallHistoryTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    call.name,
+                    call.contactName.isNotEmpty
+                        ? '${call.contactName} • ${call.phoneNumber}'
+                        : call.phoneNumber,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: theme.colorScheme.onSurface,
@@ -798,15 +804,16 @@ class CallHistoryTile extends StatelessWidget {
   }
 
   String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = twoDigits(duration.inHours);
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-
-    if (duration.inHours > 0) {
-      return '$hours:$minutes:$seconds';
+    if (duration.inSeconds < 60) {
+      return '${duration.inSeconds}s';
+    } else if (duration.inMinutes < 60) {
+      return '${duration.inMinutes}min ${duration.inSeconds.remainder(60)}s';
+    } else {
+      final hours = duration.inHours;
+      final minutes = duration.inMinutes.remainder(60);
+      final seconds = duration.inSeconds.remainder(60);
+      return '${hours}hr ${minutes}min ${seconds}s';
     }
-    return '$minutes:$seconds';
   }
 }
 

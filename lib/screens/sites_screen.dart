@@ -274,11 +274,11 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                     height: 1.5,
                   ),
                 ),
-                SizedBox(height: 16),
+                SizedBox(height: 8),
                 Text(
-                  visit['title'] ?? 'No Title',
+                  '${visit['packageName'] ?? 'Unknown App'}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey.shade700,
+                    color: Colors.grey.shade600,
                     height: 1.4,
                   ),
                 ),
@@ -353,6 +353,13 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
           .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
   }
 
+  String _formatDuration(int milliseconds) {
+    final seconds = (milliseconds / 1000).round();
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes}m ${remainingSeconds}s';
+  }
+
   Widget _buildVisitsList() {
     final groupedVisits = _groupVisitsByDate(_paginatedList);
     final theme = Theme.of(context);
@@ -425,6 +432,8 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
             children: visitsForDate.map((visit) {
               String formattedTime = DateFormat('HH:mm:ss').format(
                   DateTime.fromMillisecondsSinceEpoch(visit['timestamp']));
+              String duration = _formatDuration(visit['duration'] ?? 0);
+              String packageName = visit['packageName'] ?? 'Unknown App';
 
               return Card(
                 elevation: 3,
@@ -446,43 +455,71 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                                 color: Colors.blue.shade700, size: 24),
                             SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                visit['url'] ?? 'No URL',
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    visit['url'] ?? 'No URL',
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
                                       height: 1.5,
                                     ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    packageName,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                         Divider(height: 16),
-                        Text(
-                          visit['title'] ?? 'No Title',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Colors.grey.shade700,
-                                    height: 1.4,
-                                  ),
-                        ),
-                        SizedBox(height: 8),
+                        if (visit['title'] != null) ...[
+                          Text(
+                            visit['title'],
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade700,
+                              height: 1.4,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                        ],
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.access_time,
-                                size: 16, color: Colors.grey),
-                            SizedBox(width: 4),
-                            Text(
-                              formattedTime,
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 13,
-                              ),
+                            Row(
+                              children: [
+                                Icon(Icons.access_time,
+                                    size: 16, color: Colors.grey),
+                                SizedBox(width: 4),
+                                Text(
+                                  formattedTime,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Icon(Icons.timer, size: 16, color: Colors.grey),
+                                SizedBox(width: 4),
+                                Text(
+                                  duration,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

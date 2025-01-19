@@ -115,6 +115,7 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
               type: smsData['type'] is int
                   ? smsData['type']
                   : int.tryParse(smsData['type'].toString()) ?? 1,
+              contactName: smsData['contactName'] ?? '', // Add this line
             ));
           });
         });
@@ -626,6 +627,7 @@ class SmsInfo {
   final String body;
   final int timestamp;
   final int type;
+  final String contactName; // Add this field
 
   SmsInfo({
     required this.date,
@@ -633,6 +635,7 @@ class SmsInfo {
     required this.body,
     required this.timestamp,
     required this.type,
+    this.contactName = '', // Add default value
   });
 }
 
@@ -810,7 +813,9 @@ class SmsHistoryTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      sms.address,
+                      sms.contactName.isNotEmpty
+                          ? '${sms.contactName} • ${sms.address}'
+                          : sms.address,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.colorScheme.onSurface,
