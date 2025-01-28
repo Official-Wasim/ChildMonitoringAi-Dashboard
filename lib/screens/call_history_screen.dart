@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sticky_headers/sticky_headers/widget.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Add this import
 import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
+import '../models/call_info.dart';
+
+// ...existing code...
 
 class CallHistoryScreen extends StatefulWidget {
   const CallHistoryScreen({Key? key}) : super(key: key);

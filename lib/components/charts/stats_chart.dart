@@ -66,51 +66,67 @@ class StatsService {
 
   Future<Map<String, dynamic>> _fetchCallStats(
       String userId, String deviceId, String date) async {
-    final snapshot = await _databaseRef
-        .child('users/$userId/phones/$deviceId/calls/$date')
-        .get();
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final yesterday = DateFormat('yyyy-MM-dd')
+        .format(DateTime.now().subtract(const Duration(days: 1)));
 
-    if (!snapshot.exists) {
+    try {
+      final results = await Future.wait([
+        _databaseRef.child('users/$userId/phones/$deviceId/calls/$today').get(),
+        _databaseRef.child('users/$userId/phones/$deviceId/calls/$yesterday').get(),
+      ]);
+
+      final todaySnapshot = results[0];
+      final yesterdaySnapshot = results[1];
+
+      // Simply count total number of calls for today
+      int todayTotal = 0;
+      List<Map<String, dynamic>> callDetails = [];
+
+      if (todaySnapshot.exists) {
+        final todayCalls = todaySnapshot.value as Map<dynamic, dynamic>;
+        todayTotal = todayCalls.length;
+        
+        // Store call details for pie chart
+        todayCalls.forEach((key, value) {
+          if (value is Map) {
+            callDetails.add(Map<String, dynamic>.from(value));
+          }
+        });
+      }
+
+      // Count yesterday's calls
+      int yesterdayTotal = 0;
+      if (yesterdaySnapshot.exists) {
+        final yesterdayCalls = yesterdaySnapshot.value as Map<dynamic, dynamic>;
+        yesterdayTotal = yesterdayCalls.length;
+      }
+
+      // Calculate trend
+      double callTrend = 0;
+      if (yesterdayTotal > 0) {
+        callTrend = ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100;
+      }
+
+      debugPrint('Today\'s total calls: $todayTotal');
+      debugPrint('Yesterday\'s total calls: $yesterdayTotal');
+      debugPrint('Call trend: $callTrend%');
+
       return {
-        'incoming': 0,
-        'outgoing': 0,
-        'missed': 0,
-        'totalDuration': 0,
+        'totalCalls': todayTotal,
+        'yesterdayTotal': yesterdayTotal,
+        'trend': callTrend,
+        'details': callDetails,
+      };
+    } catch (e) {
+      debugPrint('Error fetching call stats: $e');
+      return {
         'totalCalls': 0,
+        'yesterdayTotal': 0,
+        'trend': 0.0,
         'details': [],
       };
     }
-
-    final callsData = Map<String, dynamic>.from(snapshot.value as Map);
-    int incoming = 0, outgoing = 0, missed = 0, totalDuration = 0;
-    List<Map<String, dynamic>> callDetails = [];
-
-    callsData.forEach((callId, callData) {
-      final call = Map<String, dynamic>.from(callData as Map);
-      callDetails.add(call);
-      switch (call['type']) {
-        case 'incoming':
-          incoming++;
-          totalDuration += (call['duration'] ?? 0) as int;
-          break;
-        case 'outgoing':
-          outgoing++;
-          totalDuration += (call['duration'] ?? 0) as int;
-          break;
-        case 'missed':
-          missed++;
-          break;
-      }
-    });
-
-    return {
-      'incoming': incoming,
-      'outgoing': outgoing,
-      'missed': missed,
-      'totalDuration': totalDuration,
-      'totalCalls': callsData.length,
-      'details': callDetails,
-    };
   }
 
   Future<Map<String, dynamic>> _fetchMessageStats(String userId,

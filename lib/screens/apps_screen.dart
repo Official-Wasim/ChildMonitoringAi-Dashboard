@@ -654,41 +654,48 @@ class _AppsScreenState extends State<AppsScreen> {
             ],
           ),
         ),
-        child: SafeArea(  // Wrap with SafeArea
+        child: SafeArea(
+          // Wrap with SafeArea
           child: Column(
             children: [
               const SizedBox(height: 16),
               _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : _filteredApps.isEmpty
-                    ? Center(
-                        child: Text('No apps found matching "$_searchQuery".',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      )
-                    : Expanded(
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Text('Found ${_filteredApps.length} apps',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.blue,
-                                  fontWeight: FontWeight.w500,
+                  ? Center(child: CircularProgressIndicator())
+                  : _filteredApps.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No apps found matching "$_searchQuery".',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        )
+                      : Expanded(
+                          child: Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'Found ${_filteredApps.length} apps',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                 ),
                               ),
-                            ),
-                            Expanded(
-                              child: SmartRefresher(
-                                controller: _refreshController,
-                                enablePullDown: true,
-                                onRefresh: () => _fetchAppsData(isRefresh: true),
-                                child: _buildAppsList(),
+                              Expanded(
+                                child: SmartRefresher(
+                                  controller: _refreshController,
+                                  enablePullDown: true,
+                                  onRefresh: () =>
+                                      _fetchAppsData(isRefresh: true),
+                                  child: _buildAppsList(),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
             ],
           ),
         ),

@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import 'package:sticky_headers/sticky_headers/widget.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
+import '../models/contact_info.dart';
 
 class ContactsScreen extends StatefulWidget {
   final String phoneModel; // Add this line

@@ -5,16 +5,24 @@ import 'dashboard_screen.dart';
 import 'recents_screen.dart';
 import 'remote_commands_screen.dart';
 import 'stats_screen.dart';
+import '../theme/theme.dart';
 
 class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Settings'),
+        title: Text('Settings', style: AppTheme.headlineStyle),
+        backgroundColor: AppTheme.primaryColor,
+        shape: AppTheme.appBarTheme.shape,
       ),
-      body: Center(
-        child: Text('Settings Screen Content'),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: AppTheme.backgroundGradient,
+        ),
+        child: Center(
+          child: Text('Settings Screen Content', style: AppTheme.titleStyle),
+        ),
       ),
       bottomNavigationBar: CurvedNavigationBar(
         index: 4, // Settings tab
@@ -42,7 +50,7 @@ class SettingsScreen extends StatelessWidget {
         ],
         color: Colors.white,
         buttonBackgroundColor: Colors.white,
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: AppTheme.primaryColor,
         animationCurve: Curves.easeInOutCubic,
         animationDuration: const Duration(milliseconds: 800),
         onTap: (index) {

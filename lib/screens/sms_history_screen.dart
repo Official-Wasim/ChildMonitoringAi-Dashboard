@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:sticky_headers/sticky_headers/widget.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/sms_info.dart';
 
 class SmsHistoryScreen extends StatefulWidget {
   const SmsHistoryScreen({Key? key}) : super(key: key);
@@ -29,6 +30,18 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
   static const int _itemsPerPage = 20;
   int _currentPage = 0;
   bool _hasMoreData = true;
+
+  // Add color scheme constants
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
 
   List<SmsInfo> get _paginatedList {
     final startIndex = 0;
@@ -196,11 +209,18 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
             width: 340,
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  Color(0xFFF5F6FF), // Very light indigo
+                ],
+              ),
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: primaryColor.withOpacity(0.15),
                   blurRadius: 20,
                   offset: Offset(0, 10),
                 ),
@@ -214,12 +234,12 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
                     Container(
                       padding: EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.filter_list,
-                        color: Colors.blue,
+                        color: primaryColor,
                       ),
                     ),
                     SizedBox(width: 12),
@@ -372,6 +392,20 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
           .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
   }
 
+  // Add this method to determine if we're on a small screen
+  bool _isSmallScreen(BuildContext context) {
+    return MediaQuery.of(context).size.width < 600;
+  }
+
+  // Add this method to get adaptive padding
+  EdgeInsets _getAdaptivePadding(BuildContext context) {
+    final isSmall = _isSmallScreen(context);
+    return EdgeInsets.symmetric(
+      horizontal: isSmall ? 16.0 : 24.0,
+      vertical: isSmall ? 8.0 : 16.0,
+    );
+  }
+
   Widget _buildSmsList() {
     final groupedMessages = _groupSmsByDate(_paginatedList);
     final theme = Theme.of(context);
@@ -420,17 +454,19 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                       colors: [
-                        Colors.blue,
-                        Colors.blue.withOpacity(0.8),
+                        primaryColor, // Deep Indigo
+                        secondaryColor, // Slightly lighter Indigo
                       ],
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
+                        color: primaryColor.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
@@ -447,7 +483,7 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
                 Text(
                   '${messagesForDate.length} messages',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.blue,
+                    color: primaryColor.withOpacity(0.8),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -479,16 +515,24 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = _isSmallScreen(context);
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight + 60),
+        preferredSize:
+            Size.fromHeight(kToolbarHeight + (isSmallScreen ? 60 : 80)),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryColor, secondaryColor],
+            ),
             borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(40),
-              bottomRight: Radius.circular(40),
+              bottomLeft: Radius.circular(isSmallScreen ? 30 : 40),
+              bottomRight: Radius.circular(isSmallScreen ? 30 : 40),
             ),
             boxShadow: [
               BoxShadow(
@@ -518,46 +562,60 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(80), // Reduced from 100
+              preferredSize: Size.fromHeight(isSmallScreen ? 70 : 80),
               child: Container(
-                padding: const EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  bottom: 20, // Reduced from 30
-                  top: 8, // Reduced from 12
+                height: isSmallScreen ? 70 : 80, // Add explicit height
+                padding: EdgeInsets.only(
+                  left: isSmallScreen ? 16 : 24,
+                  right: isSmallScreen ? 16 : 24,
+                  bottom: isSmallScreen ? 16 : 20,
+                  top: isSmallScreen ? 8 : 12,
                 ),
                 child: Row(
                   children: [
                     Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return SizedBox(
+                            // Wrap with SizedBox for explicit constraints
+                            height: constraints.maxHeight,
+                            child: Container(
+                              width: constraints.maxWidth,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: TextField(
+                                onChanged: _onSearchChanged,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontSize: isSmallScreen ? 14 : 16,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Search SMS...',
+                                  hintStyle:
+                                      theme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  prefixIcon:
+                                      Icon(Icons.search, color: primaryColor),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 12),
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
-                        child: TextField(
-                          onChanged: _onSearchChanged,
-                          style: theme.textTheme.bodyMedium,
-                          decoration: InputDecoration(
-                            hintText: 'Search SMS...',
-                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey.shade600,
-                            ),
-                            prefixIcon: Icon(Icons.search, color: Colors.blue),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isSmallScreen ? 8 : 12),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
@@ -579,12 +637,14 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              Color(0xFFE8EAF6), // Light Indigo 50
+              Color(0xFFC5CAE9), // Indigo 100
+              Color(0xFFE8EAF6), // Light Indigo 50
             ],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
@@ -592,25 +652,40 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
             children: [
               Expanded(
                 child: _isLoading
-                    ? Center(child: CircularProgressIndicator())
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(primaryColor),
+                        ),
+                      )
                     : _filteredSmsList.isEmpty
                         ? Center(
-                            child: Text(
-                              _errorMessage.isEmpty
-                                  ? _selectedFilter == "incoming"
-                                      ? 'No incoming SMS found matching "$_searchQuery".'
-                                      : _selectedFilter == "outgoing"
-                                          ? 'No outgoing SMS found matching "$_searchQuery".'
-                                          : 'No SMS found matching "$_searchQuery".'
-                                  : _errorMessage,
-                              style: Theme.of(context).textTheme.bodyMedium,
+                            child: Padding(
+                              padding: _getAdaptivePadding(context),
+                              child: Text(
+                                _errorMessage.isEmpty
+                                    ? _selectedFilter == "incoming"
+                                        ? 'No incoming SMS found matching "$_searchQuery".'
+                                        : _selectedFilter == "outgoing"
+                                            ? 'No outgoing SMS found matching "$_searchQuery".'
+                                            : 'No SMS found matching "$_searchQuery".'
+                                    : _errorMessage,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: primaryColor,
+                                  fontSize: isSmallScreen ? 14 : 16,
+                                ),
+                              ),
                             ),
                           )
-                        : SmartRefresher(
-                            controller: _refreshController,
-                            enablePullDown: true,
-                            onRefresh: () => _fetchSmsData(isRefresh: true),
-                            child: _buildSmsList(),
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              return SmartRefresher(
+                                controller: _refreshController,
+                                enablePullDown: true,
+                                onRefresh: () => _fetchSmsData(isRefresh: true),
+                                child: _buildResponsiveSmsList(constraints),
+                              );
+                            },
                           ),
               ),
             ],
@@ -619,24 +694,42 @@ class _SmsHistoryScreenState extends State<SmsHistoryScreen> {
       ),
     );
   }
-}
 
-class SmsInfo {
-  final String date;
-  final String address;
-  final String body;
-  final int timestamp;
-  final int type;
-  final String contactName; // Add this field
+  Widget _buildResponsiveSmsList(BoxConstraints constraints) {
+    final isWideScreen = constraints.maxWidth > 900;
+    final groupedMessages = _groupSmsByDate(_paginatedList);
 
-  SmsInfo({
-    required this.date,
-    required this.address,
-    required this.body,
-    required this.timestamp,
-    required this.type,
-    this.contactName = '', // Add default value
-  });
+    if (isWideScreen) {
+      // Grid layout for wider screens
+      return GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 2.5,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        padding: EdgeInsets.all(16),
+        itemCount: _paginatedList.length + (_hasMoreData ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= _paginatedList.length) {
+            return Center(
+              child: TextButton(
+                onPressed: _loadMoreData,
+                child: Text('Load More'),
+              ),
+            );
+          }
+          return SmsHistoryTile(
+            sms: _paginatedList[index],
+            formattedDate: _getFormattedDate(_paginatedList[index].timestamp),
+          );
+        },
+      );
+    } else {
+      // Original list layout for smaller screens
+      return _buildSmsList();
+    }
+  }
 }
 
 class SmsHistoryTile extends StatelessWidget {
@@ -659,7 +752,14 @@ class SmsHistoryTile extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: 400),
           padding: EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white,
+                Colors.white.withOpacity(0.95),
+              ],
+            ),
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
@@ -763,29 +863,40 @@ class SmsHistoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
     return GestureDetector(
       onTap: () => _showMessageDialog(context),
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
+        margin: EdgeInsets.symmetric(
+          vertical: isSmallScreen ? 4 : 6,
+          horizontal: isSmallScreen ? 0 : 8,
+        ),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Colors.white.withOpacity(0.95),
+            ],
+          ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: theme.shadowColor.withOpacity(0.1),
+              color: Colors.blue.withOpacity(0.1),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
           child: Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: isSmallScreen ? 44 : 52,
+                height: isSmallScreen ? 44 : 52,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -819,6 +930,7 @@ class SmsHistoryTile extends StatelessWidget {
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.colorScheme.onSurface,
+                        fontSize: isSmallScreen ? 14 : 16,
                       ),
                     ),
                     const SizedBox(height: 4),

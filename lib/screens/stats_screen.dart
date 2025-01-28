@@ -12,6 +12,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/charts/stats_chart.dart';
 import '../components/charts/stats_cards.dart';
+import '../theme/theme.dart';
 
 class AdvancedStatsScreen extends StatefulWidget {
   const AdvancedStatsScreen({Key? key}) : super(key: key);
@@ -259,214 +260,224 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: false, // Changed to false
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.blue,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-            size: 22,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          "Statistics",
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(40), // Keep bottom corners rounded
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60), // Adjusted height
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: 16,
-              right: 16,
-              bottom: 12,
-              top: 12,
+    final screenSize = MediaQuery.of(context).size;
+    final isTablet = screenSize.width > 600;
+
+    return WillPopScope(
+      onWillPop: () async {
+        if (_page != 0) {
+          setState(() => _page = 0);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        extendBodyBehindAppBar: false, // Changed to false
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: AppTheme.primaryColor,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: AppTheme.surfaceColor,
+              size: 22,
             ),
-            child: _buildDeviceSelector(), // Always show the device selector
+            onPressed: () => Navigator.of(context).pop(),
           ),
-        ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
-            ],
+          title: Text(
+            "Statistics",
+            style: AppTheme.headlineStyle,
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: _buildTimeRangeSelector(),
+          shape: AppTheme.appBarTheme.shape,
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(60), // Adjusted height
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: 12,
+                top: 12,
               ),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.08),
-                      blurRadius: 20,
-                      offset: const Offset(0, 4),
+              child: _buildDeviceSelector(), // Always show the device selector
+            ),
+          ),
+        ),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: AppTheme.backgroundGradient,
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Column(
+                  children: [
+                    Container(
+                      margin: EdgeInsets.all(constraints.maxWidth * 0.04),
+                      padding: EdgeInsets.all(constraints.maxWidth * 0.04),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: _buildTimeRangeSelector(),
                     ),
-                  ],
-                ),
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    highlightColor: Colors.transparent,
-                    splashColor: Colors.transparent,
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: false, // Changed to false
-                    indicator: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.blue.shade400,
-                          Colors.blue.shade600,
+                    Container(
+                      margin: EdgeInsets.symmetric(
+                          horizontal: constraints.maxWidth * 0.04,
+                          vertical: constraints.maxWidth * 0.02),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.08),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
                         ],
                       ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          highlightColor: Colors.transparent,
+                          splashColor: Colors.transparent,
                         ),
-                      ],
+                        child: TabBar(
+                          controller: _tabController,
+                          isScrollable: true, // Changed to false
+                          indicator: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.blue.shade400,
+                                Colors.blue.shade600,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blue.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          labelStyle: const TextStyle(
+                            fontSize: 13, // Reduced font size
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3, // Reduced letter spacing
+                          ),
+                          unselectedLabelStyle: const TextStyle(
+                            fontSize: 12, // Reduced font size
+                            fontWeight: FontWeight.w500,
+                          ),
+                          indicatorSize: TabBarIndicatorSize.tab,
+                          labelColor: Colors.white,
+                          unselectedLabelColor: Colors.grey[600],
+                          indicatorPadding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
+                          tabs: [
+                            _buildTab(Icons.dashboard_outlined, 'Overview'),
+                            _buildTab(Icons.message_outlined, 'Chats'),
+                            _buildTab(Icons.apps_outlined, 'Apps'),
+                          ],
+                        ),
+                      ),
                     ),
-                    labelStyle: const TextStyle(
-                      fontSize: 13, // Reduced font size
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3, // Reduced letter spacing
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildOverviewTab(constraints),
+                          _buildCommunicationTab(constraints),
+                          _buildAppStatsTab(constraints),
+                        ],
+                      ),
                     ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontSize: 12, // Reduced font size
-                      fontWeight: FontWeight.w500,
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.grey[600],
-                    indicatorPadding: const EdgeInsets.all(4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 6,
-                    ),
-                    tabs: [
-                      _buildTab(Icons.dashboard_outlined, 'Overview'),
-                      _buildTab(Icons.message_outlined, 'Chats'),
-                      _buildTab(Icons.apps_outlined, 'Apps'),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildOverviewTab(),
-                    _buildCommunicationTab(),
-                    _buildAppStatsTab(),
                   ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: CurvedNavigationBar(
-        key: _bottomNavigationKey,
-        index: _page,
-        items: [
-          CurvedNavigationBarItem(
-            child: Icon(Icons.home_outlined),
-            label: 'Home',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.history),
-            label: 'Recent',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.phone_android_outlined),
-            label: 'Remote',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.bar_chart),
-            label: 'Stats',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-        color: Colors.white,
-        buttonBackgroundColor: Colors.white,
-        backgroundColor: Colors.blueAccent,
-        animationCurve: Curves.easeInOutCubic,
-        animationDuration: const Duration(milliseconds: 800),
-        onTap: (index) {
-          setState(() {
-            _page = index;
-          });
-          Navigator.push(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) {
-                if (index == 0) {
-                  return DashboardScreen();
-                } else if (index == 1) {
-                  return RecentsScreen();
-                } else if (index == 2) {
-                  return const RemoteControlScreen();
-                } else if (index == 3) {
-                  return const AdvancedStatsScreen();
-                } else if (index == 4) {
-                  return SettingsScreen();
-                } else {
-                  return DashboardScreen();
-                }
-              },
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                const begin = Offset(1.0, 0.0);
-                const end = Offset.zero;
-                const curve = Curves.easeInOutCubic;
-
-                var tween = Tween(begin: begin, end: end)
-                    .chain(CurveTween(curve: curve));
-
-                return SlideTransition(
-                  position: animation.drive(tween),
-                  child: child,
                 );
               },
             ),
-          );
-        },
-        letIndexChange: (index) => true,
+          ),
+        ),
+        bottomNavigationBar: CurvedNavigationBar(
+          key: _bottomNavigationKey,
+          index: _page,
+          items: const [
+            // Add const to prevent rebuilds
+            CurvedNavigationBarItem(
+              child: Icon(Icons.home_outlined),
+              label: 'Home',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.history),
+              label: 'Recent',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.phone_android_outlined),
+              label: 'Remote',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.bar_chart),
+              label: 'Stats',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.settings),
+              label: 'Settings',
+            ),
+          ],
+          color: Colors.white,
+          buttonBackgroundColor: Colors.white,
+          backgroundColor: AppTheme.primaryColor,
+          animationCurve: Curves.easeInOutCubic,
+          animationDuration: const Duration(milliseconds: 800),
+          onTap: (index) {
+            // Prevent navigation if already on the selected page
+            if (index == _page) return;
+
+            setState(() {
+              _page = index;
+            });
+
+            // Use Navigator.pushReplacement instead of push to prevent stack buildup
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  switch (index) {
+                    case 0:
+                      return DashboardScreen();
+                    case 1:
+                      return RecentsScreen();
+                    case 2:
+                      return RemoteControlScreen();
+                    case 3:
+                      return AdvancedStatsScreen();
+                    case 4:
+                      return SettingsScreen();
+                    default:
+                      return DashboardScreen();
+                  }
+                },
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(1.0, 0.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeInOutCubic;
+
+                  var tween = Tween(begin: begin, end: end)
+                      .chain(CurveTween(curve: curve));
+
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
+              ),
+            );
+          },
+          letIndexChange: (index) => true,
+        ),
       ),
     );
   }
@@ -524,6 +535,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     );
   }
 
+  // Add null safety to time range selector
   Widget _buildTimeRangeSelector() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -533,25 +545,33 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(_timeRanges.length, (index) {
-          return GestureDetector(
-            onTap: () => setState(() => _selectedTimeRange = index),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: _selectedTimeRange == index
-                    ? Colors.white
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                _timeRanges[index],
-                style: TextStyle(
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (mounted) {
+                  setState(() => _selectedTimeRange = index);
+                }
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
                   color: _selectedTimeRange == index
-                      ? const Color(0xFF6C5CE7)
-                      : Colors.white,
-                  fontWeight: FontWeight.bold,
+                      ? Colors.white
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _timeRanges[index],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _selectedTimeRange == index
+                        ? const Color(0xFF6C5CE7)
+                        : Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -561,9 +581,12 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     );
   }
 
-  Widget _buildOverviewTab() {
+  Widget _buildOverviewTab(BoxConstraints constraints) {
+    final isTablet = constraints.maxWidth > 600;
+    final padding = constraints.maxWidth * 0.04;
+
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(padding),
       children: [
         StatsCard.buildQuickStats(
           context: context,
@@ -572,63 +595,68 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
           messageTrend: _messageTrend,
           callTrend: _callTrend,
           showTrendInfo: _showTrendInfo,
+          constraints: constraints,
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildScreenTimeCard(_screenTimeData),
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildWebVisitsPieChart(
             _webVisitsData, _isLoading), // Changed from Row to vertical layout
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildCallsPieChart(
             _callStats), // Changed from Row to vertical layout
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildDigitalWellbeingCard(),
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildTopAppsCard(),
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildLocationTimelineCard(),
       ],
     );
   }
 
-  Widget _buildCommunicationTab() {
+  Widget _buildCommunicationTab(BoxConstraints constraints) {
+    final padding = constraints.maxWidth * 0.04;
+
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: padding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: MediaQuery.of(context).size.width - 16,
+              width: constraints.maxWidth - padding * 2,
               child: StatsCard.buildCommunicationStats(),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: padding),
             StatsCard.buildSmsStatsCard(),
-            const SizedBox(height: 16),
+            SizedBox(height: padding),
             StatsCard.buildMessagingAppsCard(),
-            const SizedBox(height: 16),
+            SizedBox(height: padding),
             StatsCard.buildWebsiteStatsCard(),
-            const SizedBox(height: 16),
+            SizedBox(height: padding),
             StatsCard.buildCallHistoryCard(),
-            const SizedBox(height: 16),
+            SizedBox(height: padding),
             StatsCard.buildContactsAnalysisCard(),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+            SizedBox(height: padding),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAppStatsTab() {
+  Widget _buildAppStatsTab(BoxConstraints constraints) {
+    final padding = constraints.maxWidth * 0.04;
+
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(padding),
       children: [
         StatsCard.buildAppUsageSummary(),
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildTopAppsUsageChart(),
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildAppCategoryBreakdown(),
-        const SizedBox(height: 20),
+        SizedBox(height: padding),
         StatsCard.buildDetailedAppList(),
       ],
     );

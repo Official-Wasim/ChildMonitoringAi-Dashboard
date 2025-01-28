@@ -5,30 +5,11 @@ import 'package:sticky_headers/sticky_headers/widget.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/geocoding_service.dart';
+import '../models/location_info.dart';
+import 'map_screen.dart';
 
-class LocationInfo {
-  final double latitude;
-  final double longitude;
-  final DateTime timestamp;
-  final double accuracy;
-
-  LocationInfo({
-    required this.latitude,
-    required this.longitude,
-    required this.timestamp,
-    required this.accuracy,
-  });
-
-  factory LocationInfo.fromFirebase(
-      String timestampKey, Map<dynamic, dynamic> data) {
-    return LocationInfo(
-      latitude: (data['latitude'] as num).toDouble(),
-      longitude: (data['longitude'] as num).toDouble(),
-      accuracy: (data['accuracy'] as num).toDouble(),
-      timestamp: DateTime.fromMillisecondsSinceEpoch(int.parse(timestampKey)),
-    );
-  }
-}
+// Remove the LocationInfo class definition since we're importing it from models
 
 class LocationsScreen extends StatefulWidget {
   const LocationsScreen({super.key});
@@ -98,24 +79,33 @@ class _LocationsScreenState extends State<LocationsScreen> {
           .get();
 
       if (locationsSnapshot.exists) {
-        final Map<String, dynamic> locationsByDate =
-            Map<String, dynamic>.from(locationsSnapshot.value as Map);
+        final Map<dynamic, dynamic> locationData =
+            locationsSnapshot.value as Map<dynamic, dynamic>;
 
         final List<LocationInfo> fetchedLocations = [];
 
-        locationsByDate.forEach((dateKey, locations) {
-          final Map<String, dynamic> locationEntries =
-              Map<String, dynamic>.from(locations);
-
-          locationEntries.forEach((key, value) {
-            final locationData = Map<String, dynamic>.from(value);
-            fetchedLocations.add(LocationInfo(
-              latitude: (locationData['latitude'] as num).toDouble(),
-              longitude: (locationData['longitude'] as num).toDouble(),
-              timestamp: DateTime.fromMillisecondsSinceEpoch(int.parse(key)),
-              accuracy: (locationData['accuracy'] as num).toDouble(),
-            ));
-          });
+        locationData.forEach((dateKey, dateData) {
+          if (dateData is Map) {
+            dateData.forEach((timestampKey, locationData) {
+              if (locationData is Map) {
+                try {
+                  // Remove underscore from timestamp key before parsing
+                  final cleanTimestamp =
+                      timestampKey.toString().replaceFirst('_', '');
+                  fetchedLocations.add(LocationInfo(
+                    latitude: (locationData['latitude'] as num).toDouble(),
+                    longitude: (locationData['longitude'] as num).toDouble(),
+                    timestamp: DateTime.fromMillisecondsSinceEpoch(
+                        int.parse(cleanTimestamp)),
+                    accuracy: (locationData['accuracy'] as num).toDouble(),
+                  ));
+                } catch (e) {
+                  print('Error parsing location data: $e');
+                  print('Problematic timestamp key: $timestampKey');
+                }
+              }
+            });
+          }
         });
 
         fetchedLocations.sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -126,6 +116,11 @@ class _LocationsScreenState extends State<LocationsScreen> {
           _errorMessage = '';
           _isLoading = false;
         });
+
+        // Start fetching addresses in background without waiting
+        if (_locationsList.isNotEmpty) {
+          _fetchAddressesProgressively(_locationsList);
+        }
       } else {
         setState(() {
           _locationsList = [];
@@ -144,6 +139,25 @@ class _LocationsScreenState extends State<LocationsScreen> {
     }
     if (isRefresh) {
       _refreshController.refreshCompleted();
+    }
+  }
+
+  void _fetchAddressesProgressively(List<LocationInfo> locations) async {
+    for (var location in locations) {
+      if (!mounted) return; // Stop if widget is disposed
+      try {
+        final address = await GeocodingService.getAddressFromCoordinates(
+          location.latitude,
+          location.longitude,
+        );
+        if (mounted) {
+          setState(() {
+            location.address = address;
+          });
+        }
+      } catch (e) {
+        print('Error fetching address: $e');
+      }
     }
   }
 
@@ -461,90 +475,144 @@ class LocationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.blueAccent.withOpacity(0.1),
+            width: 1,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.blue.withOpacity(0.3),
-                    Colors.blue.withOpacity(0.1),
-                  ],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.location_on,
-                color: Colors.blue,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Location Update',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: theme.colorScheme.secondary.withOpacity(0.7),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDateTime(location.timestamp),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.secondary.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Lat: ${location.latitude.toStringAsFixed(6)}\nLon: ${location.longitude.toStringAsFixed(6)}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Accuracy: ${location.accuracy.toStringAsFixed(1)} meters',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.secondary.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blueAccent.withOpacity(0.05),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
             ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => MapScreen(location: location),
+                  ),
+                );
+              },
+              splashColor: Colors.blueAccent.withOpacity(0.1),
+              highlightColor: Colors.blueAccent.withOpacity(0.05),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 16,
+                          color: Colors.blueAccent,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDateTime(location.timestamp),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.blueAccent,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '±${location.accuracy.toStringAsFixed(1)}m',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (location.address != 'Fetching address...')
+                            Text(
+                              location.address,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                height: 1.3,
+                                fontWeight: FontWeight.w600, // Made bolder
+                                fontSize: 13.5, // Slightly larger
+                              ),
+                              maxLines: 3, // Changed from 2 to 3
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          else
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.blueAccent,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Fetching address...',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.blueAccent,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Text(
+                                '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.blueAccent.withOpacity(0.8),
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

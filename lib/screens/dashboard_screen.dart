@@ -16,6 +16,12 @@ import 'remote_commands_screen.dart';
 import 'stats_screen.dart';
 import 'recents_screen.dart';
 import 'settings_screeen.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:intl/intl.dart';
+import '../models/location_info.dart';
+import 'map_screen.dart';
+import '../services/geocoding_service.dart'; // Add this import
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -46,10 +52,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'messages': 0,
   };
 
+  // Updated color scheme constants
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
+  static const Color textPrimaryColor = Color(0xFF1A1F36); // Dark blue-gray
+  static const Color textSecondaryColor = Color(0xFF4A5568); // Medium blue-gray
+  static const Color cardGradient1 = Color(0xFF3949AB); // Start gradient
+  static const Color cardGradient2 = Color(0xFF1A237E); // End gradient
+  static const Color statusCardBg = Color(0xFF303F9F); // Status card background
+
+  String _currentAddress = 'Fetching address...'; // Add this line
+  final LatLng _currentLocation = LatLng(19.023964, 72.850336); // Add this line
+
   @override
   void initState() {
     super.initState();
     _fetchDevices(); // Fetch devices
+    _fetchAddressWithRetry(); // Add this line
   }
 
   // Fetch devices from Firebase
@@ -115,64 +142,129 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // Add this method
+  Future<void> _fetchAddress() async {
+    try {
+      final address = await GeocodingService.getAddressFromCoordinates(
+        _currentLocation.latitude,
+        _currentLocation.longitude,
+      );
+      if (mounted) {
+        setState(() {
+          _currentAddress = address;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching address: $e');
+    }
+  }
+
+  Future<void> _fetchAddressWithRetry() async {
+    for (int i = 0; i < 3; i++) {
+      try {
+        await _fetchAddress();
+        if (_currentAddress != 'Fetching address...' &&
+            _currentAddress != 'Location unavailable') {
+          break;
+        }
+        await Future.delayed(Duration(seconds: 2));
+      } catch (e) {
+        debugPrint('Retry $i failed: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+    final expandedHeight = screenSize.height * 0.62;
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Extended app bar background
-          Container(
-            height: MediaQuery.of(context).size.height * 0.40,
-            decoration: BoxDecoration(
-              color: Colors.blueAccent,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              backgroundGradientStart,
+              backgroundGradientEnd,
+            ],
+            stops: const [0.0, 1.0],
           ),
-          // Main content
-          RefreshIndicator(
-            onRefresh: () async {
-              await _fetchDevices();
-              if (_selectedDevice != 'Select Device') {
-                await _fetchDeviceData(_selectedDevice);
-              }
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                children: [
-                  // App Bar
-                  Container(
-                    height: kToolbarHeight + 30,
-                    child: AppBar(
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: NestedScrollView(
+                headerSliverBuilder:
+                    (BuildContext context, bool innerBoxIsScrolled) {
+                  return [
+                    SliverAppBar(
+                      expandedHeight: MediaQuery.of(context).size.height * 0.56,
+                      toolbarHeight: kToolbarHeight,
+                      floating: false,
+                      pinned: true,
                       elevation: 0,
-                      backgroundColor: Colors.transparent,
-                      leading: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: CircleAvatar(
-                          radius: 15,
-                          backgroundColor: Colors.white,
-                          child: Text(
-                            'U', // Static initial
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blueAccent,
-                            ),
-                          ),
-                        ),
+                      flexibleSpace: LayoutBuilder(
+                        builder:
+                            (BuildContext context, BoxConstraints constraints) {
+                          return Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [primaryColor, secondaryColor],
+                                  ),
+                                  borderRadius: BorderRadius.only(
+                                    bottomLeft: Radius.circular(30),
+                                    bottomRight: Radius.circular(30),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: primaryColor.withOpacity(0.2),
+                                      blurRadius: 12,
+                                      offset: Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              FlexibleSpaceBar(
+                                background: SafeArea(
+                                  child: SingleChildScrollView(
+                                    physics: NeverScrollableScrollPhysics(),
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        top: kToolbarHeight,
+                                        bottom: 2,
+                                        left: 16,
+                                        right: 16,
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _buildWelcomeSection(),
+                                          SizedBox(
+                                              height: screenSize.height * 0.01),
+                                          _buildStatusSection(),
+                                          SizedBox(
+                                              height: screenSize.height * 0),
+                                          _buildLocationCard(context),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                collapseMode: CollapseMode.pin,
+                              ),
+                            ],
+                          );
+                        },
                       ),
+                      backgroundColor: Colors.transparent,
                       title: const Text(
                         'Dashboard',
                         style: TextStyle(
@@ -182,147 +274,150 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       centerTitle: true,
+                      leading: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: CircleAvatar(
+                          radius: 15,
+                          backgroundColor: Colors.white,
+                          child: Text(
+                            'U',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ),
                       actions: [
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                constraints:
-                                    const BoxConstraints(minWidth: 120),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _selectedDevice,
-                                    icon: const Icon(Icons.phone_android,
-                                        color: Colors.white),
-                                    dropdownColor: Colors.blueAccent,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    onChanged: (String? newValue) async {
-                                      if (newValue != null &&
-                                          newValue != _selectedDevice) {
-                                        final prefs = await SharedPreferences
-                                            .getInstance();
-                                        await prefs.setString(
-                                            SELECTED_DEVICE_KEY, newValue);
-                                        setState(() {
-                                          _selectedDevice = newValue;
-                                        });
-                                        _fetchDeviceData(newValue);
-                                      }
-                                    },
-                                    items: _devices
-                                        .map<DropdownMenuItem<String>>(
-                                            (String value) {
-                                      return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(
-                                          // Truncate text if longer than 10 characters
-                                          value.length > 10
-                                              ? '${value.substring(0, 10)}...'
-                                              : value,
-                                          style: TextStyle(
-                                            color: value == 'Select Device'
-                                                ? Colors.white70
-                                                : Colors.white,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
+                          child: Container(
+                            constraints: const BoxConstraints(minWidth: 120),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _selectedDevice,
+                                icon: const Icon(Icons.phone_android,
+                                    color: Colors.white),
+                                dropdownColor: primaryColor,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
                                 ),
+                                onChanged: (String? newValue) async {
+                                  if (newValue != null &&
+                                      newValue != _selectedDevice) {
+                                    final prefs =
+                                        await SharedPreferences.getInstance();
+                                    await prefs.setString(
+                                        SELECTED_DEVICE_KEY, newValue);
+                                    setState(() {
+                                      _selectedDevice = newValue;
+                                    });
+                                    _fetchDeviceData(newValue);
+                                  }
+                                },
+                                items: _devices.map<DropdownMenuItem<String>>(
+                                    (String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(
+                                      value.length > 10
+                                          ? '${value.substring(0, 10)}...'
+                                          : value,
+                                      style: TextStyle(
+                                        color: value == 'Select Device'
+                                            ? Colors.white70
+                                            : Colors.white,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-
-                  // Dashboard Content
-                  Container(
-                    constraints: BoxConstraints(maxWidth: 800),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Welcome Section
-                        _buildWelcomeSection(),
-
-                        // Status Cards
-                        _buildStatusSection(),
-
-                        // Location Card
-                        _buildLocationCard(context),
-
-                        const SizedBox(height: 30),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: const [
-                            Text(
-                              'Dashboard',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                  ];
+                },
+                body: RefreshIndicator(
+                  onRefresh: () async {
+                    await _fetchDevices();
+                    await _fetchAddress();
+                    if (_selectedDevice != 'Select Device') {
+                      await _fetchDeviceData(_selectedDevice);
+                    }
+                  },
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: const [
+                              Text(
+                                'Dashboard',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'See All',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.blueAccent,
-                                fontWeight: FontWeight.bold,
+                              Text(
+                                'See All',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 2),
-
-                        // Dashboard Grid
-                        _buildDashboardGrid(),
-                      ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          _buildDashboardGrid(),
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       bottomNavigationBar: CurvedNavigationBar(
         key: _bottomNavigationKey,
         index: 0,
         items: [
           CurvedNavigationBarItem(
-            child: Icon(Icons.home_outlined),
+            child: Icon(Icons.home_outlined, color: Colors.black87),
             label: 'Home',
           ),
           CurvedNavigationBarItem(
-            child: Icon(Icons.history),
+            child: Icon(Icons.history, color: Colors.black87),
             label: 'Recent',
           ),
           CurvedNavigationBarItem(
-            child: Icon(Icons.phone_android_outlined),
+            child: Icon(Icons.phone_android_outlined, color: Colors.black87),
             label: 'Remote',
           ),
           CurvedNavigationBarItem(
-            child: Icon(Icons.bar_chart),
+            child: Icon(Icons.bar_chart, color: Colors.black87),
             label: 'Stats',
           ),
           CurvedNavigationBarItem(
-            child: Icon(Icons.settings),
+            child: Icon(Icons.settings, color: Colors.black87),
             label: 'Settings',
           ),
         ],
-        color: Colors.white,
+        color: surfaceColor,
         buttonBackgroundColor: Colors.white,
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: primaryColor,
         animationCurve: Curves.easeInOutCubic,
         animationDuration: const Duration(milliseconds: 800),
         onTap: (index) {
@@ -520,53 +615,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildWelcomeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Welcome',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _username,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        // ...existing welcome section code...
-        const SizedBox(height: 4), // Reduced from 6 to 4
-        Row(
-          children: [
-            Icon(Icons.phone_android,
-                size: 16, color: Colors.white), // Added white color
-            SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                _selectedDevice,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white, // Changed to white
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: 4, vertical: 4), // Reduced padding
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Welcome',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.white70,
             ),
-          ],
-        ),
-        const SizedBox(height: 8), // Reduced from 12 to 8
-      ],
+          ),
+          const SizedBox(height: 2), // Reduced spacing
+          Text(
+            _username,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4), // Reduced spacing
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.phone_android, size: 14, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      _selectedDevice,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildStatusSection() {
+    final screenSize = MediaQuery.of(context).size;
     return Column(
       children: [
         Row(
@@ -574,71 +680,172 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             _buildStatusCard(
                 context, Icons.signal_cellular_alt, 'Online Status'),
+            SizedBox(width: screenSize.width * 0.02),
             _buildStatusCard(context, Icons.battery_charging_full, 'Battery'),
           ],
         ),
-        const SizedBox(
-            height: 10), // Add padding between status and location card
+        SizedBox(height: screenSize.height * 0.015),
       ],
     );
   }
 
   Widget _buildLocationCard(BuildContext context) {
-    return Material(
-      elevation: 4,
-      borderRadius: BorderRadius.circular(12),
+    // Create LocationInfo instance from current location data
+    final locationInfo = LocationInfo(
+      latitude: _currentLocation.latitude,
+      longitude: _currentLocation.longitude,
+      accuracy: 10.0, // You can adjust this value based on actual accuracy data
+      timestamp:
+          DateTime.now(), // You can adjust this based on actual timestamp
+      address: _currentAddress,
+    );
+
+    final screenSize = MediaQuery.of(context).size;
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MapScreen(location: locationInfo),
+          ),
+        );
+      },
       child: Container(
-        padding: const EdgeInsets.all(8), // Reduced from 12 to 8
+        height: screenSize.height * 0.25, // Responsive height
+        padding: EdgeInsets.all(screenSize.width * 0.04),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue.shade100),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
         ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                children: [
-                  Icon(Icons.location_on, size: 36, color: Colors.blueAccent),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Location',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueAccent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 24, color: Colors.white),
+                const SizedBox(width: 8),
+                const Text(
+                  'Last Location',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    DateFormat('MMM dd, HH:mm').format(DateTime.now()),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Stack(
                   children: [
-                    Text(
-                      'Last Location',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueAccent,
+                    FlutterMap(
+                      options: MapOptions(
+                        initialCenter: _currentLocation,
+                        initialZoom: 12,
                       ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.app',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _currentLocation,
+                              width: 30,
+                              height: 30,
+                              child: const Icon(
+                                Icons.location_on,
+                                color: Colors.red,
+                                size: 30,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Lorem Ipsum is simply dummy text of the printing and typesetting industry. '
-                      'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.4),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _currentAddress,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${_currentLocation.latitude.toStringAsFixed(4)}, ${_currentLocation.longitude.toStringAsFixed(4)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    '±10.0m',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -708,98 +915,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     )),
           );
         }),
-        _buildDashboardCard(context, Icons.chat_bubble,
-            '        Instant\n Messaging', _counts['messages'] ?? 0, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) =>
-                    InstantMessagingAppsScreen(phoneModel: _selectedDevice)),
-          );
-        }),
+        _buildDashboardCard(
+          context, Icons.chat_bubble,
+          'Instant\nMessaging', // Split into two lines
+          _counts['messages'] ?? 0,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      InstantMessagingAppsScreen(phoneModel: _selectedDevice)),
+            );
+          },
+          fontSize: 11, // Smaller font size for this specific card
+        ),
       ],
     );
   }
 
   Widget _buildStatusCard(BuildContext context, IconData icon, String label) {
-    return Material(
-      elevation: 4,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.45,
-        padding: const EdgeInsets.all(8), // Reduced from 10 to 8
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue.shade100),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 10.0),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20.0),
-                      child: Icon(Icons.question_mark,
-                          size: 36, color: Colors.blueAccent),
-                    ),
-                    Icon(icon, size: 36, color: Colors.blueAccent),
-                  ],
-                ),
-              ),
+    final screenSize = MediaQuery.of(context).size;
+    return Container(
+      width: screenSize.width * 0.43,
+      padding: EdgeInsets.all(screenSize.width * 0.03),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, size: 28, color: Colors.white), // Reduced icon size
+              Icon(Icons.question_mark,
+                  size: 20, color: Colors.white70), // Reduced icon size
+            ],
+          ),
+          const SizedBox(height: 8), // Reduced spacing
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13, // Slightly reduced font size
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
             ),
-            const SizedBox(height: 8), // Reduced from 10 to 8
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
 
   // Update _buildDashboardCard to handle loading state per card
   Widget _buildDashboardCard(BuildContext context, IconData icon, String label,
-      int count, VoidCallback onTap) {
+      int count, VoidCallback onTap,
+      {double fontSize = 12} // Default font size is 12
+      ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        // ...existing container decoration...
         decoration: BoxDecoration(
-          color: Colors.blueAccent.withOpacity(1),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [cardGradient1, cardGradient2],
+          ),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: cardGradient1.withOpacity(0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.white,
+              blurRadius: 0,
+              spreadRadius: 0.5,
+              offset: const Offset(0, 0),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(12.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               CircleAvatar(
-                backgroundColor: Colors.white,
+                backgroundColor: surfaceColor,
                 radius: 26,
-                child: Icon(icon, size: 32, color: Colors.blueAccent),
+                child: Icon(icon, size: 28, color: primaryColor),
               ),
               const SizedBox(width: 8),
-              FittedBox(
-                fit: BoxFit.contain,
+              Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     _isLoadingData
@@ -814,23 +1026,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           )
                         : Text(
                             '$count',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                     Text(
                       label,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            fontSize: 22,
-                          ),
+                      style: TextStyle(
+                        fontSize: fontSize, // Use the passed fontSize
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                        height: 1.1, // Reduce line height
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
                     ),
                   ],
                 ),

@@ -12,14 +12,20 @@ class StatsCard {
     required double callTrend,
     required Function(BuildContext, String, String, IconData, Color, String)
         showTrendInfo,
+    required BoxConstraints constraints,
   }) {
+    final isTablet = constraints.maxWidth > 600;
+    final crossAxisCount = isTablet ? 4 : 2;
+    final childAspectRatio = isTablet ? 1.8 : 1.5;
+    final spacing = constraints.maxWidth * 0.04;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 1.5,
+      crossAxisCount: crossAxisCount,
+      mainAxisSpacing: spacing,
+      crossAxisSpacing: spacing,
+      childAspectRatio: childAspectRatio,
       children: [
         _buildStatCard(
           title: 'Total Screen Time',
@@ -46,11 +52,18 @@ class StatsCard {
           value: '${callStats['totalCalls'] ?? 0}',
           icon: Icons.phone,
           color: const Color(0xFFFFA502),
-          trend: callTrend >= 0
-              ? '+${callTrend.toStringAsFixed(1)}%'
-              : '${callTrend.toStringAsFixed(1)}%',
-          onTrendTap: showTrendInfo,
-          context: context, // Pass context to _buildStatCard
+          trend: callStats['trend'] != null
+              ? '${(callStats['trend'] as double).toStringAsFixed(1)}%'
+              : '0%',
+          onTrendTap: (context, title, value, icon, color, trend) {
+            _showCallTrendInfo(
+              context, 
+              callStats['totalCalls'] ?? 0,
+              callStats['yesterdayTotal'] ?? 0,
+              callStats['trend'] ?? 0.0
+            );
+          },
+          context: context,
         ),
         _buildStatCard(
           title: 'Apps Used',
@@ -65,6 +78,50 @@ class StatsCard {
     );
   }
 
+  static void _showCallTrendInfo(
+    BuildContext context, 
+    int todayCalls, 
+    int yesterdayCalls, 
+    double trend
+  ) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.phone, color: const Color(0xFFFFA502)),
+              const SizedBox(width: 8),
+              const Text('Call Statistics'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Today\'s calls: $todayCalls'),
+              Text('Yesterday\'s calls: $yesterdayCalls'),
+              const SizedBox(height: 8),
+              Text(
+                'Trend: ${trend.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: trend >= 0 ? Colors.green : Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   static Widget _buildStatCard({
     required String title,
     required String value,
@@ -75,8 +132,13 @@ class StatsCard {
         onTrendTap,
     required BuildContext context, // Add this parameter
   }) {
+    final screenSize = MediaQuery.of(context).size;
+    final isTablet = screenSize.width > 600;
+    final fontSize = isTablet ? 16.0 : 12.0;
+    final iconSize = isTablet ? 24.0 : 20.0;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(screenSize.width * 0.03),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -95,12 +157,12 @@ class StatsCard {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(screenSize.width * 0.02),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: iconSize),
               ),
               GestureDetector(
                 onTap: () => onTrendTap(context, title, value, icon, color,
@@ -150,8 +212,8 @@ class StatsCard {
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 24,
+            style: TextStyle(
+              fontSize: isTablet ? 28 : 24,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -159,7 +221,7 @@ class StatsCard {
           Text(
             title,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: fontSize,
               color: Colors.grey[600],
             ),
           ),

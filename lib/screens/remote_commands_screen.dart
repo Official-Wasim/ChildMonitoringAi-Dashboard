@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test/theme/theme.dart';
 import 'dashboard_screen.dart';
 import 'recents_screen.dart';
 import 'stats_screen.dart';
@@ -281,11 +282,11 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.surfaceColor.withOpacity(0.9), // Changed from white
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -300,8 +301,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
           ),
           child: Icon(icon, color: iconColor ?? Colors.blue, size: 24),
         ),
-        title: Text(title, style: _titleStyle),
-        subtitle: Text(subtitle, style: _subtitleStyle),
+        title: Text(title, style: AppTheme.titleStyle),
+        subtitle: Text(subtitle, style: AppTheme.subtitleStyle),
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
@@ -315,7 +316,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
   Widget _buildDeviceSelector() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: AppTheme.surfaceColor.withOpacity(0.9), // Changed from white
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
@@ -374,8 +375,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: color ?? Colors.blue,
-        foregroundColor: Colors.white,
+        backgroundColor: color ?? AppTheme.primaryColor,
+        foregroundColor: AppTheme.surfaceColor,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -728,7 +729,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color:
+                  AppTheme.surfaceColor.withOpacity(0.9), // Changed from white
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -997,7 +999,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.blue,
+        backgroundColor: AppTheme.primaryColor,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
@@ -1008,15 +1010,11 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
         ),
         title: Text(
           "Remote Control",
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
+          style: AppTheme.headlineStyle,
         ),
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(40), // Keep bottom corners rounded
+            bottom: Radius.circular(30),
           ),
         ),
         bottom: PreferredSize(
@@ -1038,8 +1036,9 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              AppTheme.primaryColor,
+              AppTheme.primaryColor.withOpacity(0.1),
+              AppTheme.primaryColor.withOpacity(0.3),
             ],
           ),
         ),
@@ -1051,7 +1050,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppTheme.surfaceColor
+                      .withOpacity(0.9), // Changed from white
                   borderRadius: BorderRadius.circular(25),
                   boxShadow: [
                     BoxShadow(
@@ -1070,7 +1070,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                       borderRadius: BorderRadius.circular(20),
                     ),
                     dividerColor: Colors.transparent,
-                    labelColor: Colors.blue,
+                    labelColor: AppTheme.primaryColor,
                     unselectedLabelColor: Colors.grey[600],
                     labelStyle: _titleStyle.copyWith(fontSize: 16),
                     unselectedLabelStyle: _titleStyle.copyWith(
@@ -1212,9 +1212,9 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
             label: 'Settings',
           ),
         ],
-        color: Colors.white,
-        buttonBackgroundColor: Colors.white,
-        backgroundColor: Colors.blueAccent,
+        color: AppTheme.surfaceColor,
+        buttonBackgroundColor: AppTheme.surfaceColor,
+        backgroundColor: AppTheme.primaryColor,
         animationCurve: Curves.easeInOutCubic,
         animationDuration: const Duration(milliseconds: 800),
         onTap: (index) {
