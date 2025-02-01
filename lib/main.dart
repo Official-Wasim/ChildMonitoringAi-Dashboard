@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:io' show Platform;
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -184,7 +185,14 @@ Future<void> initializeFirebaseMessaging() async {
 
     // Get FCM token
     String? token = await messaging.getToken();
+    await updateFCMToken(token);
     debugPrint('FCM Token: $token');
+
+    // Handle token refresh
+    messaging.onTokenRefresh.listen((String token) {
+      updateFCMToken(token);
+      debugPrint('FCM Token refreshed');
+    });
 
   } catch (e) {
     debugPrint('Error initializing Firebase Messaging: $e');
@@ -193,6 +201,26 @@ Future<void> initializeFirebaseMessaging() async {
 
 class NavigationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+}
+
+// Add this new function after NavigationService class
+Future<void> updateFCMToken(String? token) async {
+  if (token == null) return;
+  
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseDatabase.instance
+          .ref()
+          .child('users')
+          .child(user.uid)
+          .child('parent_fcm_token')
+          .set(token);
+      debugPrint('FCM token updated in database');
+    }
+  } catch (e) {
+    debugPrint('Error updating FCM token: $e');
+  }
 }
 
 // Update _requestNotificationPermissions
@@ -233,6 +261,9 @@ void main() async {
 
   try {
     await Firebase.initializeApp();
+    
+    // Initialize Connectivity plugin
+    await Connectivity().checkConnectivity();
     
     // Initialize local notifications first
     await initializeLocalNotifications();

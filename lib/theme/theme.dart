@@ -62,6 +62,18 @@ class AppTheme {
     color: textSecondaryColor,
   );
 
+  static const TextStyle bodyStyle = TextStyle(
+    fontSize: 16,
+    color: textPrimaryColor,
+    fontWeight: FontWeight.w500,
+  );
+
+  static const TextStyle captionStyle = TextStyle(
+    fontSize: 12,
+    color: textSecondaryColor,
+    fontWeight: FontWeight.normal,
+  );
+
   // AppBar Theme
   static AppBarTheme appBarTheme = AppBarTheme(
     elevation: 0,

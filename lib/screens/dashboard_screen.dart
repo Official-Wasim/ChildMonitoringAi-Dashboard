@@ -22,6 +22,8 @@ import 'package:intl/intl.dart';
 import '../models/location_info.dart';
 import 'map_screen.dart';
 import '../services/geocoding_service.dart'; // Add this import
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../services/connectivity_service.dart'; // Add this import at the top with other imports
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -72,16 +74,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _currentAddress = 'Fetching address...'; // Add this line
   final LatLng _currentLocation = LatLng(19.023964, 72.850336); // Add this line
 
+  final ConnectivityService _connectivityService = ConnectivityService();
+
   @override
   void initState() {
     super.initState();
+    _initializeConnectivity();
     _fetchDevices(); // Fetch devices
     _fetchAddressWithRetry(); // Add this line
+  }
+
+  Future<void> _initializeConnectivity() async {
+    await _connectivityService.initialize();
+  }
+
+  // Add this method near the top of the class
+  Future<bool> _checkInternetConnection() async {
+    bool hasInternet = await _connectivityService.checkConnectivity();
+    if (!hasInternet && mounted) {
+      ConnectivityService.showNoInternetPopup(context);
+    }
+    return hasInternet;
   }
 
   // Fetch devices from Firebase
   Future<void> _fetchDevices() async {
     if (!mounted) return; // Add this line
+    
+    // Add internet check
+    if (!await _checkInternetConnection()) return;
+
     setState(() {
       _isLoading = true;
     });
@@ -144,6 +166,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Add this method
   Future<void> _fetchAddress() async {
+    // Add internet check
+    if (!await _checkInternetConnection()) return;
+
     try {
       final address = await GeocodingService.getAddressFromCoordinates(
         _currentLocation.latitude,
@@ -484,6 +509,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       return;
     }
+
+    // Add internet check
+    if (!await _checkInternetConnection()) return;
 
     setState(() {
       _isLoadingData = true;
@@ -969,13 +997,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // Add this method to handle card taps with internet check
+  Future<void> _handleCardTap(VoidCallback navigationCallback) async {
+    if (await _checkInternetConnection()) {
+      navigationCallback();
+    }
+  }
+
   // Update _buildDashboardCard to handle loading state per card
   Widget _buildDashboardCard(BuildContext context, IconData icon, String label,
       int count, VoidCallback onTap,
       {double fontSize = 12} // Default font size is 12
       ) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => _handleCardTap(onTap),
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(

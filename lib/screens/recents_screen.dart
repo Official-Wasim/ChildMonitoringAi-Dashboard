@@ -12,6 +12,14 @@ class RecentsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppTheme.surfaceColor,
+            size: 22,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: Text('Recents', style: AppTheme.headlineStyle),
         backgroundColor: AppTheme.primaryColor,
         shape: AppTheme.appBarTheme.shape,

