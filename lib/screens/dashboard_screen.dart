@@ -100,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Fetch devices from Firebase
   Future<void> _fetchDevices() async {
     if (!mounted) return; // Add this line
-
+    
     // Add internet check
     if (!await _checkInternetConnection()) return;
 
