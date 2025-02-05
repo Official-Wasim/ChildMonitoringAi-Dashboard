@@ -11,6 +11,18 @@ class MmsHistoryScreen extends StatefulWidget {
 }
 
 class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
+  // Add color scheme constants
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
+
   List<MmsInfo> _mmsList = [];
   List<MmsInfo> _filteredMmsList = [];
   String _errorMessage = '';
@@ -313,16 +325,24 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+
     return Scaffold(
-      extendBodyBehindAppBar: true, // Add this line
+      extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
+        preferredSize:
+            Size.fromHeight(kToolbarHeight + (isSmallScreen ? 60 : 80)),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryColor, secondaryColor],
+            ),
             borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(40),
-              bottomRight: Radius.circular(40),
+              bottomLeft: Radius.circular(isSmallScreen ? 30 : 40),
+              bottomRight: Radius.circular(isSmallScreen ? 30 : 40),
             ),
             boxShadow: [
               BoxShadow(
@@ -413,12 +433,14 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              Color(0xFFE8EAF6), // Light Indigo 50
+              Color(0xFFC5CAE9), // Indigo 100
+              Color(0xFFE8EAF6), // Light Indigo 50
             ],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
@@ -447,6 +469,66 @@ class _MmsHistoryScreenState extends State<MmsHistoryScreen> {
       ),
     );
   }
+
+  // Update MmsHistoryTile styling to match SmsHistoryTile
+  Widget _buildMmsHistoryTile(MmsInfo mms) {
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 0),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      // ...existing tile content...
+    );
+  }
+
+  // Update message dialog styling
+  void _showMessageDialog(BuildContext context, MmsInfo mms) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 400),
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white,
+                Color(0xFFF5F6FF), // Very light indigo
+              ],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.15),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          // ...existing dialog content...
+        ),
+      ),
+    );
+  }
 }
 
 class MmsInfo {
@@ -465,50 +547,43 @@ class MmsInfo {
   });
 }
 
+// Update MmsHistoryTile class to match SmsHistoryTile styling
 class MmsHistoryTile extends StatelessWidget {
   final MmsInfo mms;
   final String formattedDate;
+  final void Function(BuildContext, MmsInfo)? onTap;
 
   const MmsHistoryTile({
     super.key,
     required this.mms,
     required this.formattedDate,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final mmsDate = DateTime.fromMillisecondsSinceEpoch(mms.timestamp);
-
-    // Check the type of MMS and set the icon
-    IconData messageIcon =
-        mms.type == 2 ? Icons.arrow_outward : Icons.arrow_downward;
-
+    final isSmallScreen = MediaQuery.of(context).size.width < 600;
     return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Full Message'),
-            content: Text(mms.body),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('Close'),
-              ),
+      onTap: () => onTap?.call(context, mms),
+      child: Container(
+        margin: EdgeInsets.symmetric(
+          vertical: isSmallScreen ? 4 : 6,
+          horizontal: isSmallScreen ? 0 : 8,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Colors.white.withOpacity(0.95),
             ],
           ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: theme.shadowColor.withOpacity(0.1),
+              color: Colors.blue.withOpacity(0.1),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -519,7 +594,7 @@ class MmsHistoryTile extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                messageIcon,
+                mms.type == 2 ? Icons.arrow_outward : Icons.arrow_downward,
                 color: Colors.blue,
                 size: 24,
               ),

@@ -15,7 +15,12 @@ import '../components/charts/stats_cards.dart';
 import '../theme/theme.dart';
 
 class AdvancedStatsScreen extends StatefulWidget {
-  const AdvancedStatsScreen({Key? key}) : super(key: key);
+  final String selectedDevice;
+  
+  const AdvancedStatsScreen({
+    Key? key,
+    required this.selectedDevice,
+  }) : super(key: key);
 
   @override
   State<AdvancedStatsScreen> createState() => _AdvancedStatsScreenState();
@@ -448,13 +453,13 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
                     case 0:
                       return DashboardScreen();
                     case 1:
-                      return RecentsScreen();
+                      return RecentsScreen(selectedDevice: widget.selectedDevice);
                     case 2:
-                      return RemoteControlScreen();
+                      return RemoteControlScreen(selectedDevice: widget.selectedDevice);
                     case 3:
-                      return AdvancedStatsScreen();
+                      return AdvancedStatsScreen(selectedDevice: widget.selectedDevice);
                     case 4:
-                      return SettingsScreen();
+                      return SettingsScreen(selectedDevice: widget.selectedDevice);
                     default:
                       return DashboardScreen();
                   }

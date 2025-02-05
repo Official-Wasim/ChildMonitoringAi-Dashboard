@@ -11,7 +11,12 @@ import 'stats_screen.dart';
 import 'settings_screeen.dart';
 
 class RemoteControlScreen extends StatefulWidget {
-  const RemoteControlScreen({super.key});
+  final String selectedDevice;
+  
+  const RemoteControlScreen({
+    Key? key,
+    required this.selectedDevice,
+  }) : super(key: key);
 
   @override
   _RemoteControlScreenState createState() => _RemoteControlScreenState();
@@ -1218,35 +1223,31 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
         animationCurve: Curves.easeInOutCubic,
         animationDuration: const Duration(milliseconds: 800),
         onTap: (index) {
-          setState(() {
-            _page = index;
-          });
           Navigator.push(
             context,
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) {
-                if (index == 0) {
-                  return DashboardScreen();
-                } else if (index == 1) {
-                  return RecentsScreen();
-                } else if (index == 2) {
-                  return const RemoteControlScreen();
-                } else if (index == 3) {
-                  return const AdvancedStatsScreen();
-                } else if (index == 4) {
-                  return SettingsScreen();
-                } else {
-                  return DashboardScreen();
+                switch (index) {
+                  case 0:
+                    return DashboardScreen();
+                  case 1:
+                    return RecentsScreen(selectedDevice: widget.selectedDevice);
+                  case 2:
+                    return RemoteControlScreen(selectedDevice: widget.selectedDevice);
+                  case 3:
+                    return AdvancedStatsScreen(selectedDevice: widget.selectedDevice);
+                  case 4:
+                    return SettingsScreen(selectedDevice: widget.selectedDevice);
+                  default:
+                    return DashboardScreen();
                 }
               },
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 const begin = Offset(1.0, 0.0);
                 const end = Offset.zero;
                 const curve = Curves.easeInOutCubic;
 
-                var tween = Tween(begin: begin, end: end)
-                    .chain(CurveTween(curve: curve));
+                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
 
                 return SlideTransition(
                   position: animation.drive(tween),

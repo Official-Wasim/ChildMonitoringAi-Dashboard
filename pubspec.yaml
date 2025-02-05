@@ -15,7 +15,7 @@ dependencies:
   curved_labeled_navigation_bar: ^2.0.5 
   firebase_core: ^2.14.0
   firebase_database: ^10.5.7
-  url_launcher: ^6.1.10
+  url_launcher: ^6.2.1
   firebase_auth: ^4.3.0
   pull_to_refresh: ^2.0.0
   shared_preferences: ^2.3.5
@@ -32,6 +32,7 @@ dependencies:
   firebase_analytics: ^10.8.0
   flutter_local_notifications: ^14.1.5
   connectivity_plus: ^6.1.2
+
   
 dev_dependencies:
   flutter_test:

@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/instant_messaging_apps.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:io' show Platform;
 import 'package:connectivity_plus/connectivity_plus.dart';

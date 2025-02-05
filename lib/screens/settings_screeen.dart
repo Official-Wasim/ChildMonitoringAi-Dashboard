@@ -32,6 +32,13 @@ class SettingsController extends ChangeNotifier {
 }
 
 class SettingsScreen extends StatefulWidget {
+  final String selectedDevice;
+
+  const SettingsScreen({
+    Key? key,
+    required this.selectedDevice,
+  }) : super(key: key);
+
   @override
   _SettingsScreenState createState() => _SettingsScreenState();
 }
@@ -197,16 +204,22 @@ class _SettingsScreenState extends State<SettingsScreen>
             context,
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) {
-                if (index == 0) {
-                  return DashboardScreen();
-                } else if (index == 1) {
-                  return RecentsScreen();
-                } else if (index == 2) {
-                  return const RemoteControlScreen();
-                } else if (index == 3) {
-                  return const AdvancedStatsScreen();
-                } else {
-                  return SettingsScreen();
+                switch (index) {
+                  case 0:
+                    return DashboardScreen();
+                  case 1:
+                    return RecentsScreen(selectedDevice: widget.selectedDevice);
+                  case 2:
+                    return RemoteControlScreen(
+                        selectedDevice: widget.selectedDevice);
+                  case 3:
+                    return AdvancedStatsScreen(
+                        selectedDevice: widget.selectedDevice);
+                  case 4:
+                    return SettingsScreen(
+                        selectedDevice: widget.selectedDevice);
+                  default:
+                    return DashboardScreen();
                 }
               },
               transitionsBuilder:

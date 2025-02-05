@@ -21,9 +21,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import '../models/location_info.dart';
 import 'map_screen.dart';
-import '../services/geocoding_service.dart'; // Add this import
+import '../services/geocoding_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import '../services/connectivity_service.dart'; // Add this import at the top with other imports
+import '../services/connectivity_service.dart';
+import 'dart:async'; // Add this import
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -41,6 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const String SELECTED_DEVICE_KEY = 'selected_device';
   bool _isLoading = false; // Set to false by default
   bool _isLoadingData = false;
+  bool _isInitialLoad = true;
 
   // Add count variables
   Map<String, int> _counts = {
@@ -71,21 +73,82 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const Color cardGradient2 = Color(0xFF1A237E); // End gradient
   static const Color statusCardBg = Color(0xFF303F9F); // Status card background
 
-  String _currentAddress = 'Fetching address...'; // Add this line
-  final LatLng _currentLocation = LatLng(19.023964, 72.850336); // Add this line
+  String _currentAddress = 'Waiting for location...';
+  LatLng _currentLocation = LatLng(0, 0);
+  MapController _mapController = MapController(); // Add this line
+  bool _hasLocationData = false;
 
   final ConnectivityService _connectivityService = ConnectivityService();
+
+  // Add stream subscription variables
+  StreamSubscription? _deviceDataSubscription;
+  StreamSubscription? _connectivitySubscription;
+  bool _disposed = false;
+
+  // Add this method to track refresh timestamp
+  Future<void> _trackRefreshRequest() async {
+    try {
+      _safeSetState(() {
+        _isRefreshing = true;
+      });
+
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null && _selectedDevice != 'Select Device') {
+        final DatabaseReference refreshRef = FirebaseDatabase.instance
+            .reference()
+            .child(
+                'users/${user.uid}/phones/$_selectedDevice/on_refresh/refresh_requested');
+
+        await refreshRef.set(ServerValue.timestamp);
+
+        // Wait for a few seconds to allow the device to process the refresh
+        await Future.delayed(const Duration(seconds: 3));
+        await _fetchRefreshResults();
+      }
+    } catch (e) {
+      debugPrint('Error tracking refresh: $e');
+    } finally {
+      _safeSetState(() {
+        _isRefreshing = false;
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _initializeConnectivity();
-    _fetchDevices(); // Fetch devices
+    _loadSavedDeviceAndFetchData(); // Replace _fetchDevices() with this
     _fetchAddressWithRetry(); // Add this line
+    // Add this line to fetch initial status
+    _fetchRefreshResults();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _deviceDataSubscription?.cancel();
+    _connectivitySubscription?.cancel();
+    _connectivityService.dispose(); // Add this line
+    super.dispose();
+  }
+
+  // Safe setState method
+  void _safeSetState(VoidCallback fn) {
+    if (!_disposed && mounted) {
+      setState(fn);
+    }
   }
 
   Future<void> _initializeConnectivity() async {
     await _connectivityService.initialize();
+    _connectivitySubscription =
+        _connectivityService.onConnectivityChanged.listen((bool hasConnection) {
+      if (_disposed) return;
+      if (!hasConnection && mounted) {
+        ConnectivityService.showNoInternetPopup(context);
+      }
+    });
   }
 
   // Add this method near the top of the class
@@ -97,10 +160,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return hasInternet;
   }
 
+  // Add this new method
+  Future<void> _loadSavedDeviceAndFetchData() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? savedDevice = prefs.getString(SELECTED_DEVICE_KEY);
+
+    if (savedDevice != null) {
+      setState(() {
+        _selectedDevice = savedDevice;
+      });
+    }
+
+    await _fetchDevices();
+
+    // If we have a saved device and it exists in the fetched devices list
+    if (savedDevice != null && _devices.contains(savedDevice)) {
+      await _fetchDeviceData(savedDevice);
+      if (_isInitialLoad) {
+        await _trackRefreshRequest();
+        _isInitialLoad = false;
+      }
+    }
+  }
+
   // Fetch devices from Firebase
   Future<void> _fetchDevices() async {
     if (!mounted) return; // Add this line
-    
+
     // Add internet check
     if (!await _checkInternetConnection()) return;
 
@@ -118,36 +204,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final DatabaseEvent event = await devicesRef.once();
         if (event.snapshot.value != null) {
           final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          List<String> devices = ['Select Device', ...data.keys];
+
+          // Create a Set to ensure unique device names
+          Set<String> uniqueDevices = {'Select Device'};
+          uniqueDevices.addAll(data.keys.map((key) => key.toString()));
+
+          // Convert Set back to List and sort
+          List<String> devices = uniqueDevices.toList()..sort();
+
+          // Make sure 'Select Device' is always first
+          devices.remove('Select Device');
+          devices.insert(0, 'Select Device');
 
           if (mounted) {
-            // Add this check
             setState(() {
               _devices = devices;
+
+              // Ensure selected device exists in the list
+              if (!devices.contains(_selectedDevice)) {
+                _selectedDevice = 'Select Device';
+              }
+
               _isLoading = false;
             });
-          }
-
-          // Load previously selected device
-          final prefs = await SharedPreferences.getInstance();
-          String? savedDevice = prefs.getString(SELECTED_DEVICE_KEY);
-          if (savedDevice != null && devices.contains(savedDevice)) {
-            if (mounted) {
-              // Add this check
-              setState(() {
-                _selectedDevice = savedDevice;
-              });
-            }
-            await _fetchDeviceData(savedDevice);
           }
         }
       }
     } catch (e) {
       debugPrint('Error fetching devices: $e');
       if (mounted) {
-        // Add this check
         setState(() {
           _isLoading = false;
+          _selectedDevice = 'Select Device';
         });
       }
     }
@@ -164,38 +252,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Add this method
   Future<void> _fetchAddress() async {
-    // Add internet check
     if (!await _checkInternetConnection()) return;
 
+    if (!_hasLocationData ||
+        _currentLocation.latitude == 0 && _currentLocation.longitude == 0) {
+      setState(() {
+        _currentAddress = 'Location unavailable';
+      });
+      return;
+    }
+
     try {
+      setState(() {
+        _currentAddress = 'Fetching address...';
+      });
+
       final address = await GeocodingService.getAddressFromCoordinates(
         _currentLocation.latitude,
         _currentLocation.longitude,
       );
+
       if (mounted) {
         setState(() {
-          _currentAddress = address;
+          _currentAddress = address.isNotEmpty ? address : 'Address not found';
         });
       }
     } catch (e) {
       debugPrint('Error fetching address: $e');
+      if (mounted) {
+        setState(() {
+          _currentAddress = 'Error fetching address';
+        });
+      }
     }
   }
 
   Future<void> _fetchAddressWithRetry() async {
+    if (!_hasLocationData) return;
+
     for (int i = 0; i < 3; i++) {
       try {
         await _fetchAddress();
         if (_currentAddress != 'Fetching address...' &&
-            _currentAddress != 'Location unavailable') {
+            _currentAddress != 'Location unavailable' &&
+            _currentAddress != 'Error fetching address') {
           break;
         }
         await Future.delayed(Duration(seconds: 2));
       } catch (e) {
         debugPrint('Retry $i failed: $e');
+        if (i == 2 && mounted) {
+          // On last retry
+          setState(() {
+            _currentAddress = 'Could not fetch address';
+          });
+        }
       }
+    }
+  }
+
+  // Add these state variables
+  bool? _isConnected;
+  int? _batteryLevel;
+  bool _isRefreshing = false;
+  DateTime? _lastRefreshTime;
+  double? _lastLocationLatitude;
+  double? _lastLocationLongitude;
+  double? _lastLocationAccuracy;
+  DateTime? _lastLocationTimestamp;
+  String? _connectionType;
+  String? _connectionInfo;
+
+  // Update this method to also update the map preview
+  Future<void> _fetchRefreshResults() async {
+    if (_selectedDevice == 'Select Device') return;
+
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        DatabaseReference refreshRef = FirebaseDatabase.instance.reference().child(
+            'users/${user.uid}/phones/$_selectedDevice/on_refresh/refresh_result');
+
+        final event = await refreshRef.once();
+        if (event.snapshot.value != null) {
+          final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+          _safeSetState(() {
+            _isConnected = data['isConnected'] as bool?;
+            _batteryLevel = data['batteryLevel'] as int?;
+
+            // Update location data and map preview
+            if (data['location_latitude'] != null &&
+                data['location_longitude'] != null) {
+              _lastLocationLatitude =
+                  (data['location_latitude'] as num?)?.toDouble();
+              _lastLocationLongitude =
+                  (data['location_longitude'] as num?)?.toDouble();
+              _lastLocationAccuracy =
+                  (data['location_accuracy'] as num?)?.toDouble();
+              _lastLocationTimestamp = data['location_timestamp'] != null
+                  ? DateTime.fromMillisecondsSinceEpoch(
+                      data['location_timestamp'])
+                  : null;
+
+              // Update current location for map preview
+              _currentLocation =
+                  LatLng(_lastLocationLatitude!, _lastLocationLongitude!);
+              _hasLocationData = true;
+
+              // Move map to new location
+              if (mounted) {
+                _mapController.move(_currentLocation, 15);
+                setState(() {});
+              }
+
+              _fetchAddressWithRetry();
+            }
+
+            _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(
+                data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch);
+            _connectionType = data['connectionType']?.toString();
+            _connectionInfo = data['connectionInfo']?.toString();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching refresh results: $e');
     }
   }
 
@@ -321,7 +503,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             constraints: const BoxConstraints(minWidth: 120),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: _selectedDevice,
+                                value: _devices.contains(_selectedDevice)
+                                    ? _selectedDevice
+                                    : 'Select Device',
                                 icon: const Icon(Icons.phone_android,
                                     color: Colors.white),
                                 dropdownColor: primaryColor,
@@ -332,7 +516,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 onChanged: (String? newValue) async {
                                   if (newValue != null &&
-                                      newValue != _selectedDevice) {
+                                      newValue != _selectedDevice &&
+                                      _devices.contains(newValue)) {
                                     final prefs =
                                         await SharedPreferences.getInstance();
                                     await prefs.setString(
@@ -340,7 +525,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     setState(() {
                                       _selectedDevice = newValue;
                                     });
-                                    _fetchDeviceData(newValue);
+                                    await _fetchDeviceData(newValue);
                                   }
                                 },
                                 items: _devices.map<DropdownMenuItem<String>>(
@@ -370,6 +555,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 },
                 body: RefreshIndicator(
                   onRefresh: () async {
+                    await _trackRefreshRequest();
                     await _fetchDevices();
                     await _fetchAddress();
                     if (_selectedDevice != 'Select Device') {
@@ -446,43 +632,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         animationCurve: Curves.easeInOutCubic,
         animationDuration: const Duration(milliseconds: 800),
         onTap: (index) {
-          setState(() {
-            _page = index;
-          });
-          Navigator.push(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) {
-                if (index == 0) {
-                  return DashboardScreen();
-                } else if (index == 1) {
-                  return RecentsScreen();
-                } else if (index == 2) {
-                  return const RemoteControlScreen();
-                } else if (index == 3) {
-                  return const AdvancedStatsScreen();
-                } else if (index == 4) {
-                  return SettingsScreen();
-                } else {
-                  return DashboardScreen();
-                }
-              },
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                const begin = Offset(1.0, 0.0);
-                const end = Offset.zero;
-                const curve = Curves.easeInOutCubic;
-
-                var tween = Tween(begin: begin, end: end)
-                    .chain(CurveTween(curve: curve));
-
-                return SlideTransition(
-                  position: animation.drive(tween),
-                  child: child,
-                );
-              },
-            ),
-          );
+          _handleNavigation(index);
         },
         letIndexChange: (index) => true,
       ),
@@ -491,161 +641,168 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Fetch data according to the selected device node
   Future<void> _fetchDeviceData(String device) async {
+    // Cancel any existing subscription
+    await _deviceDataSubscription?.cancel();
+
     if (device == 'Select Device') {
-      if (mounted) {
-        setState(() {
-          _counts = {
-            'sms': 0,
-            'mms': 0,
-            'calls': 0,
-            'locations': 0,
-            'contacts': 0,
-            'apps': 0,
-            'sites': 0,
-            'messages': 0,
-          };
-          _username = 'User';
-        });
-      }
+      _safeSetState(() {
+        _counts = {
+          'sms': 0,
+          'mms': 0,
+          'calls': 0,
+          'locations': 0,
+          'contacts': 0,
+          'apps': 0,
+          'sites': 0,
+          'messages': 0,
+        };
+        _username = 'User';
+      });
       return;
     }
 
     // Add internet check
     if (!await _checkInternetConnection()) return;
 
-    setState(() {
+    _safeSetState(() {
       _isLoadingData = true;
     });
 
     try {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        if (_isInitialLoad || device != _selectedDevice) {
+          await _trackRefreshRequest();
+          _isInitialLoad = false;
+        }
+
         DatabaseReference deviceDataRef = FirebaseDatabase.instance
             .reference()
             .child('users/${user.uid}/phones/$device');
 
-        // Fetch username from user-details
-        final DatabaseEvent userDetailsEvent =
-            await deviceDataRef.child('user-details/name').once();
-        if (userDetailsEvent.snapshot.value != null) {
-          if (mounted) {
-            setState(() {
-              _username = userDetailsEvent.snapshot.value.toString();
+        // Set up stream subscription for real-time updates
+        _deviceDataSubscription = deviceDataRef.onValue.listen((event) {
+          if (_disposed) return;
+
+          final data = event.snapshot.value;
+          if (data == null || data is! Map) {
+            _safeSetState(() {
+              _isLoadingData = false;
             });
-          }
-        }
-
-        deviceDataRef.keepSynced(true);
-
-        final DatabaseEvent event = await deviceDataRef.once();
-        if (event.snapshot.value != null) {
-          final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          Map<String, int> newCounts = {
-            'sms': 0,
-            'mms': 0,
-            'calls': 0,
-            'locations': 0,
-            'contacts': 0,
-            'apps': 0,
-            'sites': 0,
-            'messages': 0,
-          };
-
-          // Helper function to count items in nested date structure
-          int countNestedData(Map dateData) {
-            int count = 0;
-            for (var dateEntries in dateData.values) {
-              if (dateEntries is Map) {
-                count += dateEntries.length;
-              }
-            }
-            return count;
+            return;
           }
 
-          // Count SMS messages
-          if (data['sms'] is Map) {
-            newCounts['sms'] = countNestedData(data['sms']);
-          }
-
-          // Count MMS messages
-          if (data['mms'] is Map) {
-            newCounts['mms'] = countNestedData(data['mms']);
-          }
-
-          // Count calls
-          if (data['calls'] is Map) {
-            newCounts['calls'] = countNestedData(data['calls']);
-          }
-
-          // Count locations
-          if (data['location'] is Map) {
-            newCounts['locations'] = countNestedData(data['location']);
-          }
-
-          // Update contacts counting logic
-          if (data.containsKey('contacts')) {
-            try {
-              final contactsData = data['contacts'];
-              if (contactsData is Map) {
-                newCounts['contacts'] =
-                    contactsData.length; // Direct count of contacts
-              }
-            } catch (e) {
-              debugPrint('Error counting contacts: $e');
-              newCounts['contacts'] = 0;
-            }
-          }
-
-          // Count apps
-          if (data['apps'] is Map) {
-            newCounts['apps'] = data['apps'].length;
-          }
-
-          // Count web visits
-          if (data['web_visits'] is Map) {
-            newCounts['sites'] = countNestedData(data['web_visits']);
-          }
-
-          // Update instant messages counting logic
-          if (data['social_media_messages'] is Map) {
-            int messageCount = 0;
-            final messagesData = data['social_media_messages'] as Map;
-            messagesData.forEach((date, platformData) {
-              if (platformData is Map) {
-                platformData.forEach((platform, messages) {
-                  if (messages is Map) {
-                    messageCount += messages.length;
-                  }
-                });
-              }
-            });
-            newCounts['messages'] = messageCount;
-          }
-
-          if (mounted) {
-            // Add this check
-            setState(() {
-              _counts = newCounts;
-            });
-          }
-        }
-      }
-    } catch (e, stackTrace) {
-      debugPrint('Error fetching device data: $e\n$stackTrace');
-      // Optionally show an error message to the user
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingData = false;
+          _updateDeviceData(Map<String, dynamic>.from(data));
+        }, onError: (error) {
+          debugPrint('Error in device data stream: $error');
+          _safeSetState(() {
+            _isLoadingData = false;
+          });
         });
       }
+    } catch (e) {
+      debugPrint('Error setting up device data stream: $e');
+      _safeSetState(() {
+        _isLoadingData = false;
+      });
     }
   }
 
+  // Helper method to update device data
+  void _updateDeviceData(Map<String, dynamic> data) {
+    if (_disposed) return;
+
+    Map<String, int> newCounts = Map.from(_counts);
+    String currentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // Helper function to count current day's items
+    int countTodayItems(Map dateData) {
+      if (dateData[currentDate] is Map) {
+        return dateData[currentDate].length;
+      }
+      return 0;
+    }
+
+    // Update username if available
+    if (data['user-details'] != null && data['user-details']['name'] != null) {
+      _username = data['user-details']['name'].toString();
+    }
+
+    // Count items for today
+    if (data['sms'] is Map) newCounts['sms'] = countTodayItems(data['sms']);
+    if (data['mms'] is Map) newCounts['mms'] = countTodayItems(data['mms']);
+    if (data['calls'] is Map)
+      newCounts['calls'] = countTodayItems(data['calls']);
+    if (data['location'] is Map)
+      newCounts['locations'] = countTodayItems(data['location']);
+    if (data['contacts'] is Map)
+      newCounts['contacts'] = data['contacts'].length;
+    if (data['apps'] is Map) newCounts['apps'] = data['apps'].length;
+    if (data['web_visits'] is Map)
+      newCounts['sites'] = countTodayItems(data['web_visits']);
+
+    // Count instant messages for today
+    if (data['social_media_messages'] is Map &&
+        data['social_media_messages'][currentDate] is Map) {
+      int messageCount = 0;
+      final todayMessages = data['social_media_messages'][currentDate] as Map;
+      todayMessages.forEach((platform, messages) {
+        if (messages is Map) {
+          messageCount += messages.length;
+        }
+      });
+      newCounts['messages'] = messageCount;
+    }
+
+    // Update location data and map preview
+    if (data['location'] is Map &&
+        data['location_latitude'] != null &&
+        data['location_longitude'] != null) {
+      final double lat = (data['location_latitude'] as num).toDouble();
+      final double lng = (data['location_longitude'] as num).toDouble();
+
+      _safeSetState(() {
+        _lastLocationLatitude = lat;
+        _lastLocationLongitude = lng;
+        _lastLocationAccuracy =
+            (data['location_accuracy'] as num?)?.toDouble() ?? 10.0;
+        _lastLocationTimestamp = data['location_timestamp'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(data['location_timestamp'])
+            : DateTime.now();
+
+        _currentLocation = LatLng(lat, lng);
+        _hasLocationData = true;
+
+        // Move map to new location
+        if (mounted) {
+          _mapController.move(_currentLocation, 15);
+          // Fetch address after location update
+          _fetchAddressWithRetry();
+          setState(() {});
+        }
+      });
+    }
+
+    _safeSetState(() {
+      _counts = newCounts;
+      _isLoadingData = false;
+    });
+  }
+
   Widget _buildWelcomeSection() {
+    String? displayConnectionType;
+    String? displayConnectionInfo;
+
+    if (_connectionInfo != null) {
+      final parts = _connectionInfo!.split(': ');
+      if (parts.length == 2) {
+        displayConnectionType = parts[0];
+        displayConnectionInfo = parts[1];
+      }
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: 4, vertical: 4), // Reduced padding
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -657,7 +814,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.white70,
             ),
           ),
-          const SizedBox(height: 2), // Reduced spacing
+          const SizedBox(height: 2),
           Text(
             _username,
             style: const TextStyle(
@@ -666,7 +823,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 4), // Reduced spacing
+          const SizedBox(height: 4),
           Row(
             children: [
               Container(
@@ -692,6 +849,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
+              SizedBox(width: 8),
+              if (_connectionInfo != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        displayConnectionType?.toLowerCase().contains('wifi') ??
+                                false
+                            ? Icons.wifi
+                            : Icons.signal_cellular_alt,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        displayConnectionInfo ?? 'Unknown',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Spacer(), // Add Spacer to push the next container to the right end
+              if (_lastRefreshTime != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.refresh, size: 12, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text(
+                        'Last Update: ${DateFormat('MMM dd, HH:mm:ss').format(_lastRefreshTime!)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ],
@@ -722,21 +936,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final locationInfo = LocationInfo(
       latitude: _currentLocation.latitude,
       longitude: _currentLocation.longitude,
-      accuracy: 10.0, // You can adjust this value based on actual accuracy data
-      timestamp:
-          DateTime.now(), // You can adjust this based on actual timestamp
+      accuracy: _lastLocationAccuracy ?? 10.0,
+      timestamp: _lastLocationTimestamp ?? DateTime.now(),
       address: _currentAddress,
     );
 
     final screenSize = MediaQuery.of(context).size;
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MapScreen(location: locationInfo),
-          ),
-        );
+        if (_hasLocationData) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MapScreen(
+                location: LocationInfo(
+                  latitude: _currentLocation.latitude,
+                  longitude: _currentLocation.longitude,
+                  accuracy: _lastLocationAccuracy ?? 10.0,
+                  timestamp: _lastLocationTimestamp ?? DateTime.now(),
+                  address: _currentAddress,
+                ),
+              ),
+            ),
+          );
+        }
       },
       child: Container(
         height: screenSize.height * 0.25, // Responsive height
@@ -770,7 +993,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    DateFormat('MMM dd, HH:mm').format(DateTime.now()),
+                    _lastLocationTimestamp != null
+                        ? DateFormat('MMM dd, HH:mm:ss')
+                            .format(_lastLocationTimestamp!)
+                        : 'No timestamp',
                     style: const TextStyle(
                       fontSize: 12,
                       color: Colors.white,
@@ -786,9 +1012,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Stack(
                   children: [
                     FlutterMap(
+                      mapController: _mapController, // Add this line
                       options: MapOptions(
-                        initialCenter: _currentLocation,
-                        initialZoom: 12,
+                        initialCenter:
+                            _hasLocationData ? _currentLocation : LatLng(0, 0),
+                        initialZoom: _hasLocationData ? 15 : 2,
+                        interactionOptions: InteractionOptions(
+                          enableScrollWheel: false,
+                          enableMultiFingerGestureRace: false,
+                          flags: InteractiveFlag.none,
+                        ),
                       ),
                       children: [
                         TileLayer(
@@ -796,20 +1029,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.example.app',
                         ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _currentLocation,
-                              width: 30,
-                              height: 30,
-                              child: const Icon(
-                                Icons.location_on,
-                                color: Colors.red,
-                                size: 30,
+                        if (_hasLocationData) ...[
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: _currentLocation,
+                                width: 40,
+                                height: 40,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.3),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                          CircleLayer(
+                            circles: [
+                              CircleMarker(
+                                point: _currentLocation,
+                                radius:
+                                    (_lastLocationAccuracy ?? 100).toDouble(),
+                                useRadiusInMeter: true,
+                                color: Colors.blue.withOpacity(0.1),
+                                borderColor: Colors.blue.withOpacity(0.3),
+                                borderStrokeWidth: 2,
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                     Container(
@@ -836,7 +1104,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _currentAddress,
+                        _hasLocationData
+                            ? _currentAddress
+                            : 'Waiting for location data...',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -845,32 +1115,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        '${_currentLocation.latitude.toStringAsFixed(4)}, ${_currentLocation.longitude.toStringAsFixed(4)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.7),
+                      if (_hasLocationData)
+                        Text(
+                          '${_currentLocation.latitude.toStringAsFixed(4)}, ${_currentLocation.longitude.toStringAsFixed(4)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    '±10.0m',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
+                if (_hasLocationData)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '±${_lastLocationAccuracy?.toStringAsFixed(1) ?? '10.0'}m',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ],
@@ -963,6 +1235,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildStatusCard(BuildContext context, IconData icon, String label) {
     final screenSize = MediaQuery.of(context).size;
+    final bool isOnlineCard = label == 'Online Status';
+    final bool isBatteryCard = label == 'Battery';
+
+    String statusText = '';
+    IconData statusIcon = Icons.question_mark;
+    Color statusColor = Colors.white70;
+
+    if (isOnlineCard && _isConnected != null) {
+      statusText = _isConnected! ? 'Online' : 'Offline';
+      statusIcon = _isConnected! ? Icons.check_circle : Icons.cancel;
+      statusColor = _isConnected! ? Colors.green : Colors.red;
+    } else if (isBatteryCard && _batteryLevel != null) {
+      statusText = '$_batteryLevel%';
+      if (_batteryLevel! > 80) {
+        statusIcon = Icons.battery_full;
+        statusColor = Colors.green;
+      } else if (_batteryLevel! > 20) {
+        statusIcon = Icons.battery_5_bar;
+        statusColor = Colors.orange;
+      } else {
+        statusIcon = Icons.battery_alert;
+        statusColor = Colors.red;
+      }
+    }
+
     return Container(
       width: screenSize.width * 0.43,
       padding: EdgeInsets.all(screenSize.width * 0.03),
@@ -977,16 +1274,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, size: 28, color: Colors.white), // Reduced icon size
-              Icon(Icons.question_mark,
-                  size: 20, color: Colors.white70), // Reduced icon size
+              Icon(icon, size: 28, color: Colors.white),
+              if (_isRefreshing)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              else
+                Icon(statusIcon, size: 20, color: statusColor),
             ],
           ),
-          const SizedBox(height: 8), // Reduced spacing
+          const SizedBox(height: 8),
           Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13, // Slightly reduced font size
+            (_isRefreshing)
+                ? 'Refreshing...'
+                : (statusText.isNotEmpty ? statusText : label),
+            style: TextStyle(
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               color: Colors.white,
             ),
@@ -1009,8 +1317,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       int count, VoidCallback onTap,
       {double fontSize = 12} // Default font size is 12
       ) {
+    // Get the category key from label
+    final categoryKey = label.toLowerCase().replaceAll('\n', '_');
+
     return GestureDetector(
-      onTap: () => _handleCardTap(onTap),
+      onTap: () async {
+        await _handleCardTap(() async {
+          // Navigate first
+          onTap();
+        });
+      },
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -1060,7 +1376,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           )
                         : Text(
-                            '$count',
+                            '${_counts[categoryKey] ?? 0}',
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -1085,6 +1401,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _handleNavigation(index) {
+    if (index == _page) return;
+
+    setState(() => _page = index);
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) {
+          // Pass the selectedDevice to all screens
+          switch (index) {
+            case 0:
+              return DashboardScreen();
+            case 1:
+              return RecentsScreen(selectedDevice: _selectedDevice);
+            case 2:
+              return RemoteControlScreen(selectedDevice: _selectedDevice);
+            case 3:
+              return AdvancedStatsScreen(selectedDevice: _selectedDevice);
+            case 4:
+              return SettingsScreen(selectedDevice: _selectedDevice);
+            default:
+              return DashboardScreen();
+          }
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOutCubic;
+
+          var tween =
+              Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
       ),
     );
   }
