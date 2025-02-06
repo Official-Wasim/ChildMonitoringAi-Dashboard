@@ -8,7 +8,8 @@ import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async'; 
-import '../services/recents_screen/fetch_data.dart';
+import '../services/recents_screen/fetch_recent_data.dart';
+import '../services/stats_screen/fetch_stats_data.dart';  // Add this import
 import '../theme/theme.dart';
 import 'dashboard_screen.dart';
 import 'settings_screeen.dart';
@@ -21,7 +22,7 @@ class NotificationItem {
   final String id;
   final String title;
   final String body;
-  final String type; // Add this line
+  final String type; 
   final DateTime timestamp;
 
   NotificationItem({
@@ -107,6 +108,9 @@ class _RecentsScreenState extends State<RecentsScreen>
   List<StreamSubscription> _subscriptions = [];
   bool _disposed = false;
 
+  // Add this at the top with other instance variables
+  final UserStatsService _statsService = UserStatsService();
+
   @override
   void initState() {
     super.initState();
@@ -171,21 +175,26 @@ class _RecentsScreenState extends State<RecentsScreen>
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if (_disposed) return;
+    
+    _safeSetState(() => _isLoading = true);
     try {
       if (_selectedDevice != 'Select Device') {
-        final overview = await FetchDataService.fetchTodaysOverview(
+        // Update this section to use UserStatsService instead of FetchDataService
+        final overview = await _statsService.fetchTodaysOverview(
+          FirebaseAuth.instance.currentUser!.uid,
           _selectedDevice,
-          _selectedDate, // Pass selected date
+          _selectedDate,
         );
-        setState(() {
+
+        _safeSetState(() {
           _screenTimeMinutes = overview['screenTime'];
           _appsUsed = overview['appsUsed'];
           _alertsCount = overview['alertsCount'];
         });
       }
     } finally {
-      setState(() => _isLoading = false);
+      _safeSetState(() => _isLoading = false);
     }
   }
 
@@ -194,13 +203,13 @@ class _RecentsScreenState extends State<RecentsScreen>
   }
 
   Future<void> _loadNotifications() async {
-    if (_selectedDevice == 'Select Device') return;
+    if (_disposed || _selectedDevice == 'Select Device') return;
 
     final alertsList = await FetchDataService.fetchRecentAlerts(
       _selectedDevice,
-      _selectedDate, // Pass selected date
+      _selectedDate,
     );
-    setState(() {
+    _safeSetState(() {
       notifications = alertsList
           .map((alert) => NotificationItem(
                 id: alert['id'],
@@ -215,13 +224,13 @@ class _RecentsScreenState extends State<RecentsScreen>
   }
 
   Future<void> _loadGeofenceTimeline() async {
-    if (_selectedDevice == 'Select Device') return;
+    if (_disposed || _selectedDevice == 'Select Device') return;
 
     final timeline = await FetchDataService.fetchGeofenceTimeline(
       _selectedDevice,
-      _selectedDate, // Pass selected date
+      _selectedDate,
     );
-    setState(() {
+    _safeSetState(() {
       locationData = timeline
           .map((entry) => LocationEntry(
                 time: DateFormat('HH:mm').format(
@@ -2442,4 +2451,12 @@ class _RecentsScreenState extends State<RecentsScreen>
     _tabController.dispose();
     super.dispose();
   }
+
+  // Add this method for safe state updates
+  void _safeSetState(VoidCallback fn) {
+    if (!_disposed && mounted) {
+      setState(fn);
+    }
+  }
 }
+

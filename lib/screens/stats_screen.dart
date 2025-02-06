@@ -13,10 +13,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../components/charts/stats_chart.dart';
 import '../components/charts/stats_cards.dart';
 import '../theme/theme.dart';
+import '../services/stats_screen/fetch_stats_data.dart'; // Add this import
 
 class AdvancedStatsScreen extends StatefulWidget {
   final String selectedDevice;
-  
+
   const AdvancedStatsScreen({
     Key? key,
     required this.selectedDevice,
@@ -29,10 +30,7 @@ class AdvancedStatsScreen extends StatefulWidget {
 class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _selectedTimeRange = 0; // 0: Today, 1: Week, 2: Month
-  final List<String> _timeRanges = ['Today', 'Week', 'Month'];
 
-  // Add this style definition
   final TextStyle _headlineStyle = const TextStyle(
     fontSize: 24,
     fontWeight: FontWeight.bold,
@@ -70,18 +68,33 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
   // Add this variable to store web visits data
   List<ChartData> _webVisitsData = [];
 
-  final StatsService _statsService = StatsService();
+  final UserStatsService _statsService = UserStatsService();
 
-  // Add these variables after other state variables
-  final List<ScreenTimeData> _screenTimeData = [
-    ScreenTimeData('Mon', 3),
-    ScreenTimeData('Tue', 4),
-    ScreenTimeData('Wed', 3.5),
-    ScreenTimeData('Thu', 5),
-    ScreenTimeData('Fri', 4),
-    ScreenTimeData('Sat', 6),
-    ScreenTimeData('Sun', 5),
-  ];
+  // Replace the hardcoded _screenTimeData with:
+  List<ScreenTimeData> _screenTimeData = [];
+
+  // Update these variables
+  Map<String, dynamic> _messageStats = {
+    'today': 0,
+    'yesterday': 0,
+    'trend': 0.0,
+  };
+
+  // Add these variables
+  int _screenTimeMinutes = 0;
+  int _appsUsed = 0;
+
+  // Add these variables
+  double _screenTimeTrend = 0.0;
+  double _appsUsedTrend = 0.0;
+
+  // Add this variable
+  List<Map<String, dynamic>> _topApps = [];
+
+  // Add this variable with the existing state variables
+  Map<String, dynamic>? overview;
+
+  List<Map<String, dynamic>> _detailedAppUsage = [];
 
   @override
   void initState() {
@@ -110,7 +123,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User not logged in!')),
+            const SnackBar(content: Text('User not logged in')),
           );
         }
       }
@@ -184,19 +197,43 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     });
 
     try {
-      final stats =
-          await _statsService.fetchStatsData(_userId!, _selectedPhoneModel!);
+      final results = await Future.wait([
+        _statsService.fetchTodaysOverview(
+            _userId!, _selectedPhoneModel!, DateTime.now()),
+        _statsService.fetchStatsData(_userId!, _selectedPhoneModel!),
+        _statsService.fetchTopApps(
+            _userId!, _selectedPhoneModel!, DateTime.now()),
+        _statsService.fetchScreenTimeData(_userId!, _selectedPhoneModel!),
+        _statsService.fetchDetailedAppUsage(
+            _userId!, _selectedPhoneModel!, DateTime.now()),
+      ]);
 
       if (mounted) {
         setState(() {
-          _callStats = stats['callStats'];
-          _callDetails = _callStats['details'];
+          // Store the complete overview data
+          overview = results[0] as Map<String, dynamic>;
+          _screenTimeMinutes = overview?['screenTime'] ?? 0;
+          _screenTimeTrend = overview?['screenTimeTrend'] ?? 0.0;
+          _appsUsed = overview?['appsUsed'] ?? 0;
+          _appsUsedTrend = overview?['appsUsedTrend'] ?? 0.0;
 
-          final messageStats = stats['messageStats'];
-          _totalMessagesCount = messageStats['current']['total'];
-          _messageTrend = messageStats['trend'];
+          final stats = results[1] as Map<String, dynamic>;
+          _callStats = stats['callStats'] as Map<String, dynamic>;
+          _callDetails =
+              List<Map<String, dynamic>>.from(_callStats['details'] ?? []);
+          _messageStats = stats['messageStats'] as Map<String, dynamic>;
+          _totalMessagesCount = _messageStats['current']['total'] ?? 0;
+          _messageTrend = _messageStats['trend'] ?? 0.0;
+          _webVisitsData = List<ChartData>.from(stats['webVisits'] ?? []);
 
-          _webVisitsData = stats['webVisits'];
+          _topApps = List<Map<String, dynamic>>.from(results[2] as List);
+          _screenTimeData = (results[3] as List)
+              .map((data) => data as ScreenTimeData)
+              .toList();
+
+          // Fix the type casting for detailed app usage
+          _detailedAppUsage =
+              (results[4] as List<Map<String, dynamic>>).toList();
         });
       }
     } catch (e) {
@@ -223,6 +260,50 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     bool isIncrease = trend.startsWith('+');
     Color trendColor = isIncrease ? Colors.green : Colors.red;
 
+    // Special handling for screen time
+    if (title == 'Screen Time') {
+      int todayMinutes = _screenTimeMinutes;
+      int yesterdayMinutes =
+          (todayMinutes * 100 / (100 + double.parse(numericValue))).round();
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(icon, color: color),
+                const SizedBox(width: 8),
+                Text(title),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Today: ${_formatScreenTime(todayMinutes)}'),
+                Text('Yesterday: ${_formatScreenTime(yesterdayMinutes)}'),
+                Text(
+                  'Change: $trend',
+                  style: TextStyle(
+                    color: trendColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // Handle other stats
     int todayCount = int.tryParse(value) ?? 0;
     double percentageChange = double.tryParse(numericValue) ?? 0;
     int yesterdayCount = (todayCount * 100 / (100 + percentageChange)).round();
@@ -255,6 +336,15 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
         );
       },
     );
+  }
+
+  String _formatScreenTime(int minutes) {
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${remainingMinutes}m';
+    }
+    return '${remainingMinutes}m';
   }
 
   @override
@@ -290,7 +380,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(
-            "Statistics",
+            "Statistics", // Changed from "Statistics" with potential hidden characters
             style: AppTheme.headlineStyle,
           ),
           shape: AppTheme.appBarTheme.shape,
@@ -316,15 +406,6 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
               builder: (context, constraints) {
                 return Column(
                   children: [
-                    Container(
-                      margin: EdgeInsets.all(constraints.maxWidth * 0.04),
-                      padding: EdgeInsets.all(constraints.maxWidth * 0.04),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: _buildTimeRangeSelector(),
-                    ),
                     Container(
                       margin: EdgeInsets.symmetric(
                           horizontal: constraints.maxWidth * 0.04,
@@ -453,13 +534,17 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
                     case 0:
                       return DashboardScreen();
                     case 1:
-                      return RecentsScreen(selectedDevice: widget.selectedDevice);
+                      return RecentsScreen(
+                          selectedDevice: widget.selectedDevice);
                     case 2:
-                      return RemoteControlScreen(selectedDevice: widget.selectedDevice);
+                      return RemoteControlScreen(
+                          selectedDevice: widget.selectedDevice);
                     case 3:
-                      return AdvancedStatsScreen(selectedDevice: widget.selectedDevice);
+                      return AdvancedStatsScreen(
+                          selectedDevice: widget.selectedDevice);
                     case 4:
-                      return SettingsScreen(selectedDevice: widget.selectedDevice);
+                      return SettingsScreen(
+                          selectedDevice: widget.selectedDevice);
                     default:
                       return DashboardScreen();
                   }
@@ -540,52 +625,6 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     );
   }
 
-  // Add null safety to time range selector
-  Widget _buildTimeRangeSelector() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(_timeRanges.length, (index) {
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                if (mounted) {
-                  setState(() => _selectedTimeRange = index);
-                }
-              },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _selectedTimeRange == index
-                      ? Colors.white
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _timeRanges[index],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _selectedTimeRange == index
-                        ? const Color(0xFF6C5CE7)
-                        : Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
   Widget _buildOverviewTab(BoxConstraints constraints) {
     final isTablet = constraints.maxWidth > 600;
     final padding = constraints.maxWidth * 0.04;
@@ -601,6 +640,10 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
           callTrend: _callTrend,
           showTrendInfo: _showTrendInfo,
           constraints: constraints,
+          screenTimeMinutes: _screenTimeMinutes, // Add this
+          screenTimeTrend: _screenTimeTrend,
+          appsUsed: _appsUsed, // Add this
+          appsUsedTrend: _appsUsedTrend,
         ),
         SizedBox(height: padding),
         StatsCard.buildScreenTimeCard(_screenTimeData),
@@ -613,9 +656,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
         SizedBox(height: padding),
         StatsCard.buildDigitalWellbeingCard(),
         SizedBox(height: padding),
-        StatsCard.buildTopAppsCard(),
-        SizedBox(height: padding),
-        StatsCard.buildLocationTimelineCard(),
+        StatsCard.buildTopAppsCard(_topApps),
       ],
     );
   }
@@ -631,7 +672,11 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
           children: [
             SizedBox(
               width: constraints.maxWidth - padding * 2,
-              child: StatsCard.buildCommunicationStats(),
+              child: StatsCard.buildCommunicationStats(
+                messageCount: _totalMessagesCount,
+                callCount: _callStats['totalCalls'] ?? 0,
+                contactCount: _callDetails.length,
+              ),
             ),
             SizedBox(height: padding),
             StatsCard.buildSmsStatsCard(),
@@ -652,17 +697,19 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
 
   Widget _buildAppStatsTab(BoxConstraints constraints) {
     final padding = constraints.maxWidth * 0.04;
+    final appOpensCount = (overview?['appOpens'] ?? 0) as int;
 
     return ListView(
       padding: EdgeInsets.all(padding),
       children: [
-        StatsCard.buildAppUsageSummary(),
+        StatsCard.buildAppUsageSummary(
+          appOpens: appOpensCount,
+          appsUsed: _appsUsed,
+        ),
         SizedBox(height: padding),
-        StatsCard.buildTopAppsUsageChart(),
+        StatsCard.buildTopAppsUsageChart(_topApps), // Pass the real data
         SizedBox(height: padding),
-        StatsCard.buildAppCategoryBreakdown(),
-        SizedBox(height: padding),
-        StatsCard.buildDetailedAppList(),
+        StatsCard.buildDetailedAppList(_detailedAppUsage), // Update this line
       ],
     );
   }
@@ -671,13 +718,13 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     return Tab(
       height: 44, // Reduced height
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced padding
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center, // Center the content
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18), // Reduced icon size
-            const SizedBox(width: 4), // Reduced spacing
+            Icon(icon, size: 18),
+            const SizedBox(width: 4),
             Text(label),
           ],
         ),

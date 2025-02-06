@@ -17,6 +17,7 @@ class AppTheme {
   static const Color cardGradient1 = Color(0xFF3949AB); // Start gradient
   static const Color cardGradient2 = Color(0xFF1A237E); // End gradient
   static const Color statusCardBg = Color(0xFF303F9F); // Status card background
+  static const Color scaffoldBackgroundColor = Color(0xFFF8F5FF); // Very Light Purple/White background
 
   // Gradients
   static const LinearGradient backgroundGradient = LinearGradient(

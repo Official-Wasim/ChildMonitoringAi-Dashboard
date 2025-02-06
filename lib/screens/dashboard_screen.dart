@@ -34,7 +34,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _page = 0;
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
-  String _username = 'User'; // Changed default value
+  String _username = 'User'; // default value
   String _selectedDevice = 'Select Device'; // Default selected device
   List<String> _devices = [
     'Select Device'
@@ -160,27 +160,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return hasInternet;
   }
 
-  // Add this new method
+  // Update the _loadSavedDeviceAndFetchData method
   Future<void> _loadSavedDeviceAndFetchData() async {
     final prefs = await SharedPreferences.getInstance();
     String? savedDevice = prefs.getString(SELECTED_DEVICE_KEY);
 
-    if (savedDevice != null) {
-      setState(() {
-        _selectedDevice = savedDevice;
-      });
-    }
+    setState(() {
+      _selectedDevice = savedDevice ?? 'Select Device';
+      // Initialize devices list with the saved device if it exists
+      _devices = ['Select Device'];
+      if (savedDevice != null && savedDevice != 'Select Device') {
+        _devices.add(savedDevice);
+      }
+    });
 
-    await _fetchDevices();
-
-    // If we have a saved device and it exists in the fetched devices list
-    if (savedDevice != null && _devices.contains(savedDevice)) {
+    // Fetch device data for the saved device first
+    if (savedDevice != null && savedDevice != 'Select Device') {
       await _fetchDeviceData(savedDevice);
       if (_isInitialLoad) {
         await _trackRefreshRequest();
         _isInitialLoad = false;
       }
     }
+
+    // Then fetch the complete devices list from Firebase
+    await _fetchDevices();
   }
 
   // Fetch devices from Firebase
@@ -220,9 +224,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             setState(() {
               _devices = devices;
 
-              // Ensure selected device exists in the list
-              if (!devices.contains(_selectedDevice)) {
+              // Only update _selectedDevice if it's not already set or if it's not in the new devices list
+              if (_selectedDevice == 'Select Device' && devices.length > 1) {
+                _selectedDevice = devices[1]; // Select the first actual device
+                // Save this selection to SharedPreferences
+                SharedPreferences.getInstance().then((prefs) {
+                  prefs.setString(SELECTED_DEVICE_KEY, _selectedDevice);
+                });
+              } else if (!devices.contains(_selectedDevice)) {
                 _selectedDevice = 'Select Device';
+                // Clear the saved device if it's no longer available
+                SharedPreferences.getInstance().then((prefs) {
+                  prefs.remove(SELECTED_DEVICE_KEY);
+                });
               }
 
               _isLoading = false;
@@ -323,6 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DateTime? _lastLocationTimestamp;
   String? _connectionType;
   String? _connectionInfo;
+  String? _chargingStatus;
 
   // Update this method to also update the map preview
   Future<void> _fetchRefreshResults() async {
@@ -340,6 +355,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _safeSetState(() {
             _isConnected = data['isConnected'] as bool?;
             _batteryLevel = data['batteryLevel'] as int?;
+            _chargingStatus = data['chargingStatus']?.toString();
 
             // Update location data and map preview
             if (data['location_latitude'] != null &&
@@ -893,7 +909,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.refresh, size: 12, color: Colors.white),
+                      GestureDetector(
+                        onTap: () async {
+                          await _trackRefreshRequest();
+                          await _fetchDevices();
+                          await _fetchAddress();
+                          if (_selectedDevice != 'Select Device') {
+                            await _fetchDeviceData(_selectedDevice);
+                          }
+                        },
+                        child: Icon(
+                          Icons.refresh,
+                          size: 12,
+                          color: _isRefreshing ? Colors.white38 : Colors.white,
+                        ),
+                      ),
                       SizedBox(width: 4),
                       Text(
                         'Last Update: ${DateFormat('MMM dd, HH:mm:ss').format(_lastRefreshTime!)}',
@@ -1241,23 +1271,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String statusText = '';
     IconData statusIcon = Icons.question_mark;
     Color statusColor = Colors.white70;
+    String? subtitleText;
 
     if (isOnlineCard && _isConnected != null) {
       statusText = _isConnected! ? 'Online' : 'Offline';
       statusIcon = _isConnected! ? Icons.check_circle : Icons.cancel;
       statusColor = _isConnected! ? Colors.green : Colors.red;
     } else if (isBatteryCard && _batteryLevel != null) {
-      statusText = '$_batteryLevel%';
+      String chargingIndicator = '';
+      bool isCharging = _chargingStatus != null && 
+                       _chargingStatus!.toLowerCase().contains('charging') &&
+                       !_chargingStatus!.toLowerCase().contains('discharging');
+      
+      if (isCharging) {
+        statusIcon = Icons.battery_charging_full;
+        chargingIndicator = '⚡';
+      } else {
+        if (_batteryLevel! > 80) {
+          statusIcon = Icons.battery_full;
+        } else if (_batteryLevel! > 20) {
+          statusIcon = Icons.battery_5_bar;
+        } else {
+          statusIcon = Icons.battery_alert;
+        }
+      }
+
+      statusText = '$_batteryLevel%${isCharging ? chargingIndicator : ''}';
+
       if (_batteryLevel! > 80) {
-        statusIcon = Icons.battery_full;
         statusColor = Colors.green;
       } else if (_batteryLevel! > 20) {
-        statusIcon = Icons.battery_5_bar;
         statusColor = Colors.orange;
       } else {
-        statusIcon = Icons.battery_alert;
         statusColor = Colors.red;
       }
+
+      // Set subtitle text as charging status
+      subtitleText = _chargingStatus;
     }
 
     return Container(
@@ -1275,6 +1325,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(icon, size: 28, color: Colors.white),
+              if (isBatteryCard && subtitleText != null)
+                Expanded(
+                  child: Text(
+                    subtitleText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               if (_isRefreshing)
                 const SizedBox(
                   width: 20,

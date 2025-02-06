@@ -73,7 +73,9 @@ class StatsService {
     try {
       final results = await Future.wait([
         _databaseRef.child('users/$userId/phones/$deviceId/calls/$today').get(),
-        _databaseRef.child('users/$userId/phones/$deviceId/calls/$yesterday').get(),
+        _databaseRef
+            .child('users/$userId/phones/$deviceId/calls/$yesterday')
+            .get(),
       ]);
 
       final todaySnapshot = results[0];
@@ -86,7 +88,7 @@ class StatsService {
       if (todaySnapshot.exists) {
         final todayCalls = todaySnapshot.value as Map<dynamic, dynamic>;
         todayTotal = todayCalls.length;
-        
+
         // Store call details for pie chart
         todayCalls.forEach((key, value) {
           if (value is Map) {
@@ -313,37 +315,130 @@ class ScreenTimeChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SfCartesianChart(
-      legend: Legend(
-        isVisible: true,
-        position: LegendPosition.bottom,
-        overflowMode: LegendItemOverflowMode.wrap,
-        textStyle: const TextStyle(fontSize: 12),
-        orientation: LegendItemOrientation.horizontal,
-        itemPadding: 8,
+    double totalHours = data.fold(0, (sum, item) => sum + item.hours);
+    double averageHours = totalHours / 7;
+    double maxHours = data.fold(0, (max, item) => item.hours > max ? item.hours : max);
+
+    return SingleChildScrollView(  // Add ScrollView to handle potential overflow
+      child: Column(
+        mainAxisSize: MainAxisSize.min,  // Make column take minimum space
+        children: [
+          SizedBox(  // Wrap Row in SizedBox with fixed height
+            height: 80,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Expanded(child: _buildSummaryCard(
+                  'Daily Average',
+                  '${averageHours.toStringAsFixed(1)}h',
+                  Icons.access_time,
+                  Colors.blue,
+                )),
+                Expanded(child: _buildSummaryCard(
+                  'Weekly Total',
+                  '${totalHours.toStringAsFixed(1)}h',
+                  Icons.date_range,
+                  Colors.green,
+                )),
+                Expanded(child: _buildSummaryCard(
+                  'Peak Usage',
+                  '${maxHours.toStringAsFixed(1)}h',
+                  Icons.show_chart,
+                  Colors.orange,
+                )),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),  // Reduced spacing
+          SizedBox(
+            height: 180,  // Reduced height
+            child: SfCartesianChart(
+              margin: const EdgeInsets.all(0),  // Remove chart margins
+              primaryXAxis: CategoryAxis(
+                majorGridLines: const MajorGridLines(width: 0),
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              primaryYAxis: NumericAxis(
+                minimum: 0,
+                maximum: maxHours + 1,
+                interval: 2,
+                majorGridLines: const MajorGridLines(width: 0.5, color: Colors.grey),
+                labelFormat: '{value}h',
+              ),
+              tooltipBehavior: TooltipBehavior(enable: true),
+              series: <ChartSeries<ScreenTimeData, String>>[
+                SplineAreaSeries<ScreenTimeData, String>(
+                  name: 'Screen Time',
+                  dataSource: data,
+                  xValueMapper: (ScreenTimeData data, _) => data.day,
+                  yValueMapper: (ScreenTimeData data, _) => data.hours,
+                  color: Colors.blue.withOpacity(0.2),
+                  borderColor: Colors.blue,
+                  borderWidth: 3,
+                  splineType: SplineType.natural,
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.blue.withOpacity(0.4),
+                      Colors.blue.withOpacity(0.1),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                SplineSeries<ScreenTimeData, String>(
+                  name: 'Screen Time',
+                  dataSource: data,
+                  xValueMapper: (ScreenTimeData data, _) => data.day,
+                  yValueMapper: (ScreenTimeData data, _) => data.hours,
+                  color: Colors.blue,
+                  width: 3,
+                  markerSettings: const MarkerSettings(
+                    isVisible: true,
+                    height: 8,
+                    width: 8,
+                    borderWidth: 2,
+                    borderColor: Colors.blue,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      primaryXAxis: CategoryAxis(
-        majorGridLines: const MajorGridLines(width: 0),
-      ),
-      primaryYAxis: NumericAxis(
-        minimum: 0,
-        maximum: 8,
-        interval: 2,
-        majorGridLines: const MajorGridLines(width: 0),
-      ),
-      plotAreaBorderWidth: 0,
-      series: <ChartSeries<ScreenTimeData, String>>[
-        SplineAreaSeries<ScreenTimeData, String>(
-          name: 'Screen Time',
-          dataSource: data,
-          xValueMapper: (ScreenTimeData data, _) => data.day,
-          yValueMapper: (ScreenTimeData data, _) => data.hours,
-          color: ChartColors.palette[0].withOpacity(0.2),
-          borderColor: ChartColors.palette[0],
-          borderWidth: 3,
-          splineType: SplineType.natural,
+    );
+  }
+
+  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      elevation: 0,
+      color: color.withOpacity(0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 16),  // Reduced icon size
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,  // Reduced font size
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 10,  // Reduced font size
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
