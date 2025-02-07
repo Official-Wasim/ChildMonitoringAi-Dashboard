@@ -111,6 +111,9 @@ class _RecentsScreenState extends State<RecentsScreen>
   // Add this at the top with other instance variables
   final UserStatsService _statsService = UserStatsService();
 
+  // Add this state variable
+  bool _showAllNotifications = false;
+
   @override
   void initState() {
     super.initState();
@@ -180,7 +183,6 @@ class _RecentsScreenState extends State<RecentsScreen>
     _safeSetState(() => _isLoading = true);
     try {
       if (_selectedDevice != 'Select Device') {
-        // Update this section to use UserStatsService instead of FetchDataService
         final overview = await _statsService.fetchTodaysOverview(
           FirebaseAuth.instance.currentUser!.uid,
           _selectedDevice,
@@ -190,7 +192,7 @@ class _RecentsScreenState extends State<RecentsScreen>
         _safeSetState(() {
           _screenTimeMinutes = overview['screenTime'];
           _appsUsed = overview['appsUsed'];
-          _alertsCount = overview['alertsCount'];
+          _alertsCount = overview['alertsCount']; // This will now get the correct count
         });
       }
     } finally {
@@ -445,6 +447,11 @@ class _RecentsScreenState extends State<RecentsScreen>
   }
 
   Widget _buildNotificationsSection() {
+    final displayedNotifications = _showAllNotifications 
+        ? notifications 
+        : notifications.take(6).toList();
+    final remainingCount = notifications.length - 6;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -471,16 +478,23 @@ class _RecentsScreenState extends State<RecentsScreen>
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              TextButton(
-                onPressed: () => _showAllAlerts(),
-                child: Text(
-                  'View All',
-                  style: GoogleFonts.poppins(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.w500,
+              if (notifications.length > 6)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _showAllNotifications = !_showAllNotifications;
+                    });
+                  },
+                  child: Text(
+                    _showAllNotifications 
+                        ? 'Show less' 
+                        : 'View all ($remainingCount more)',
+                    style: GoogleFonts.poppins(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -512,8 +526,27 @@ class _RecentsScreenState extends State<RecentsScreen>
               ),
             )
           else
-            ...notifications
-                .map((notification) => _buildNotificationCard(notification)),
+            ...displayedNotifications.map((notification) => _buildNotificationCard(notification)),
+          if (_showAllNotifications && notifications.length > 6)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Center(
+                child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _showAllNotifications = false;
+                    });
+                  },
+                  child: Text(
+                    'Show less',
+                    style: GoogleFonts.poppins(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -2282,38 +2315,6 @@ class _RecentsScreenState extends State<RecentsScreen>
             const SizedBox(height: 16),
             const Text('Tap on individual categories for more details.'),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAllAlerts() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'All Alerts',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: notifications
-                .map(
-                  (notification) => ListTile(
-                    title: Text(notification.title),
-                    subtitle: Text(notification.body),
-                    trailing: Text(_getTimeAgo(notification.timestamp)),
-                  ),
-                )
-                .toList(),
-          ),
         ),
         actions: [
           TextButton(

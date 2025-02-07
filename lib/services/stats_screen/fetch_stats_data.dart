@@ -406,6 +406,14 @@ class UserStatsService {
       final todayMinutes = todayDuration ~/ 60000;
       final yesterdayMinutes = yesterdayDuration ~/ 60000;
 
+      // Process notifications data to get alert count
+      int alertsCount = 0;
+      if (results[2].exists) {
+        final notificationsData = results[2].value as Map<dynamic, dynamic>;
+        // Count unique notification IDs for today
+        alertsCount = notificationsData.length;
+      }
+
       return {
         'screenTime': todayMinutes,
         'yesterdayScreenTime': yesterdayMinutes,
@@ -414,6 +422,7 @@ class UserStatsService {
         'yesterdayAppsUsed': yesterdayAppsUsed,
         'appsUsedTrend': appsUsedTrend,
         'appOpens': todayAppOpens,
+        'alertsCount': alertsCount, // Add this line
       };
     } catch (e) {
       debugPrint('Error fetching overview: $e');
@@ -425,6 +434,7 @@ class UserStatsService {
         'yesterdayAppsUsed': 0,
         'appsUsedTrend': 0.0,
         'appOpens': 0,
+        'alertsCount': 0, // Add this line
       };
     }
   }

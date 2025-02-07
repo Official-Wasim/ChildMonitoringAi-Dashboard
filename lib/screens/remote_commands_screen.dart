@@ -9,10 +9,11 @@ import 'dashboard_screen.dart';
 import 'recents_screen.dart';
 import 'stats_screen.dart';
 import 'settings_screeen.dart';
+import '../services/geocoding_service.dart';
 
 class RemoteControlScreen extends StatefulWidget {
   final String selectedDevice;
-  
+
   const RemoteControlScreen({
     Key? key,
     required this.selectedDevice,
@@ -38,9 +39,9 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
 
   // Add these properties at the top of the class
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
-  int _page = 2; // Set to 2 since this is the Remote tab
+  final int _page = 2; // Set to 2 since this is the Remote tab
 
-  late final TabController _tabController; // Change to late final
+  late final TabController _tabController;
   List<Map<String, dynamic>> _commandResults = [];
 
   // Add these text styles at the top of the class, after the properties
@@ -84,8 +85,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
     _tabController =
         TabController(length: 2, vsync: this); // Initialize before super
     super.initState();
-    _loadSelectedDevice(); // Add this line
-    _initializeUser();
+    _loadSelectedDevice();
     _fetchCommandResults();
 
     // Add listener to handle tab changes
@@ -151,6 +151,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
         _selectedPhoneModel = savedDevice;
       });
     }
+    // Fetch devices after attempting to load from shared preferences
+    _initializeUser();
   }
 
   Future<void> _fetchDevices() async {
@@ -252,7 +254,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
       final today = DateTime.now();
       final dateKey = '${today.year}-${today.month}-${today.day}';
 
-      // Convert params to Map<String, String>
       Map<String, String> params = data.map((key, value) {
         return MapEntry(key, value.toString());
       });
@@ -712,6 +713,31 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
     );
   }
 
+  Future<String> _getAddressFromResult(String result) async {
+    try {
+      // Parse the new format: "Latitude: X, Longitude: Y, Accuracy: Z meters"
+      final regex = RegExp(r'Latitude: ([\d.-]+), Longitude: ([\d.-]+)');
+      final match = regex.firstMatch(result);
+
+      if (match != null && match.groupCount == 2) {
+        final lat = double.tryParse(match.group(1)!);
+        final lng = double.tryParse(match.group(2)!);
+
+        if (lat != null && lng != null) {
+          final address =
+              await GeocodingService.getAddressFromCoordinates(lat, lng);
+          if (address.isNotEmpty) {
+            return address;
+          }
+        }
+      }
+      return 'Address not available';
+    } catch (e) {
+      print('Error getting address: $e');
+      return 'Error fetching address';
+    }
+  }
+
   Widget _buildResultsTab() {
     return RefreshIndicator(
       onRefresh: _fetchCommandResults,
@@ -884,6 +910,85 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                               ),
                             ),
                           ),
+                        )
+                      else if (command == 'get_location' &&
+                          status == 'completed')
+                        FutureBuilder<String>(
+                          future: _getAddressFromResult(commandResult),
+                          builder: (context, snapshot) {
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.grey.withOpacity(0.2),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.location_on,
+                                          size: 16, color: Colors.red),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          commandResult,
+                                          style: TextStyle(
+                                            color: Colors.grey[800],
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(height: 16),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.map,
+                                          size: 16, color: Colors.blue),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: snapshot.connectionState ==
+                                                ConnectionState.waiting
+                                            ? Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 12,
+                                                    height: 12,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Fetching address...',
+                                                    style: TextStyle(
+                                                      color: Colors.grey[600],
+                                                      fontSize: 13,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : Text(
+                                                'Address: ${snapshot.data}',
+                                                style: TextStyle(
+                                                  color: Colors.grey[800],
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         )
                       else
                         Container(
@@ -1233,21 +1338,26 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                   case 1:
                     return RecentsScreen(selectedDevice: widget.selectedDevice);
                   case 2:
-                    return RemoteControlScreen(selectedDevice: widget.selectedDevice);
+                    return RemoteControlScreen(
+                        selectedDevice: widget.selectedDevice);
                   case 3:
-                    return AdvancedStatsScreen(selectedDevice: widget.selectedDevice);
+                    return AdvancedStatsScreen(
+                        selectedDevice: widget.selectedDevice);
                   case 4:
-                    return SettingsScreen(selectedDevice: widget.selectedDevice);
+                    return SettingsScreen(
+                        selectedDevice: widget.selectedDevice);
                   default:
                     return DashboardScreen();
                 }
               },
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 const begin = Offset(1.0, 0.0);
                 const end = Offset.zero;
                 const curve = Curves.easeInOutCubic;
 
-                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                var tween = Tween(begin: begin, end: end)
+                    .chain(CurveTween(curve: curve));
 
                 return SlideTransition(
                   position: animation.drive(tween),

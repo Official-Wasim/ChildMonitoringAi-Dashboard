@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart'; // Add this import
 import 'package:pull_to_refresh/pull_to_refresh.dart'; // Add this import
 import '../models/call_info.dart';
 
-
 class CallHistoryScreen extends StatefulWidget {
   const CallHistoryScreen({Key? key}) : super(key: key);
 
@@ -16,6 +15,18 @@ class CallHistoryScreen extends StatefulWidget {
 }
 
 class _CallHistoryScreenState extends State<CallHistoryScreen> {
+  // Add color scheme constants
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
+
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   List<CallInfo> _callList = [];
   List<CallInfo> _filteredCallList = [];
@@ -388,12 +399,11 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   }
 
   Widget _buildCallsList() {
-    final groupedCalls = _groupCallsByDate(
-        _paginatedCalls); // Use _paginatedList instead of _filteredCallList
+    final groupedCalls = _groupCallsByDate(_paginatedCalls);
     final theme = Theme.of(context);
 
     return ListView.builder(
-      physics: BouncingScrollPhysics(), // Add bouncy physics
+      physics: BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: groupedCalls.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
@@ -405,7 +415,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                 onPressed: _loadMoreData,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  backgroundColor: primaryColor.withOpacity(0.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -413,7 +423,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                 child: Text(
                   'Load More',
                   style: TextStyle(
-                    color: Colors.blue,
+                    color: primaryColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -436,17 +446,19 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                       colors: [
-                        Colors.blue,
-                        Colors.blue.withOpacity(0.8),
+                        primaryColor,
+                        secondaryColor,
                       ],
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
+                        color: primaryColor.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
@@ -463,7 +475,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                 Text(
                   '${callsForDate.length} calls',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.blue,
+                    color: primaryColor.withOpacity(0.8),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -486,16 +498,22 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isSmallScreen = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
-      extendBodyBehindAppBar: true, // Add this line
+      extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
+        preferredSize:
+            Size.fromHeight(kToolbarHeight + (isSmallScreen ? 60 : 80)),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(40),
-              bottomRight: Radius.circular(40),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryColor, secondaryColor],
+            ),
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(isSmallScreen ? 30 : 40),
             ),
             boxShadow: [
               BoxShadow(
@@ -525,13 +543,14 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(80), // Changed from 100
+              preferredSize: Size.fromHeight(isSmallScreen ? 70 : 80),
               child: Container(
-                padding: const EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  bottom: 20, // Changed from 30
-                  top: 8, // Changed from 12
+                height: isSmallScreen ? 70 : 80,
+                padding: EdgeInsets.only(
+                  left: isSmallScreen ? 16 : 24,
+                  right: isSmallScreen ? 16 : 24,
+                  bottom: isSmallScreen ? 16 : 20,
+                  top: isSmallScreen ? 8 : 12,
                 ),
                 child: Row(
                   children: [
@@ -550,13 +569,15 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                         ),
                         child: TextField(
                           onChanged: _onSearchChanged,
-                          style: theme.textTheme.bodyMedium,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: isSmallScreen ? 14 : 16,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Search calls...',
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
-                            prefixIcon: Icon(Icons.search, color: Colors.blue),
+                            prefixIcon: Icon(Icons.search, color: primaryColor),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
@@ -564,7 +585,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isSmallScreen ? 8 : 12),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
@@ -589,31 +610,40 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              Color(0xFFE8EAF6), // Light Indigo 50
+              Color(0xFFC5CAE9), // Indigo 100
+              Color(0xFFE8EAF6), // Light Indigo 50
             ],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 16),
               Expanded(
                 child: _isLoading
-                    ? Center(child: CircularProgressIndicator())
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(primaryColor),
+                        ),
+                      )
                     : _filteredCallList.isEmpty
                         ? Center(
-                            child: Text(
-                              _errorMessage.isEmpty
-                                  ? _selectedFilter == "incoming"
-                                      ? 'No incoming calls found matching "$_searchQuery".'
-                                      : _selectedFilter == "outgoing"
-                                          ? 'No outgoing calls found matching "$_searchQuery".'
-                                          : _selectedFilter == "missed"
-                                              ? 'No missed calls found matching "$_searchQuery".'
-                                              : 'No calls found matching "$_searchQuery".'
-                                  : _errorMessage,
-                              style: Theme.of(context).textTheme.bodyMedium,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 16 : 24,
+                              ),
+                              child: Text(
+                                _errorMessage.isEmpty
+                                    ? _getEmptyStateMessage()
+                                    : _errorMessage,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: primaryColor,
+                                  fontSize: isSmallScreen ? 14 : 16,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           )
                         : SmartRefresher(
@@ -628,6 +658,19 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
         ),
       ),
     );
+  }
+
+  String _getEmptyStateMessage() {
+    switch (_selectedFilter) {
+      case "incoming":
+        return 'No incoming calls found matching "$_searchQuery".';
+      case "outgoing":
+        return 'No outgoing calls found matching "$_searchQuery".';
+      case "missed":
+        return 'No missed calls found matching "$_searchQuery".';
+      default:
+        return 'No calls found matching "$_searchQuery".';
+    }
   }
 
   @override

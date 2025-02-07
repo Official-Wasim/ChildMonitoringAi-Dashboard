@@ -803,179 +803,188 @@ class StatsCard {
   }
 
   static Widget buildDetailedAppList(List<Map<String, dynamic>> detailedApps) {
-    return StatefulBuilder(
-      builder: (context, setState) {
-        bool isExpanded = false;
-        
-        String _formatDuration(int milliseconds) {
-          final minutes = milliseconds ~/ 60000;
-          final hours = minutes ~/ 60;
-          final remainingMinutes = minutes % 60;
-          return hours > 0 ? '${hours}h ${remainingMinutes}m' : '${remainingMinutes}m';
-        }
+    return DetailedAppListCard(detailedApps: detailedApps);
+  }
+}
 
-        String _formatTimestamp(int timestamp) {
-          final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
-          final now = DateTime.now();
-          final difference = now.difference(dateTime);
+class DetailedAppListCard extends StatefulWidget {
+  final List<Map<String, dynamic>> detailedApps;
 
-          if (difference.inMinutes < 60) {
-            return '${difference.inMinutes}m ago';
-          } else if (difference.inHours < 24) {
-            return '${difference.inHours}h ago';
-          } else {
-            return DateFormat('h:mm a').format(dateTime);
-          }
-        }
+  const DetailedAppListCard({Key? key, required this.detailedApps}) : super(key: key);
 
-        String _formatTimeOnly(int timestamp) {
-          return DateFormat('h:mm a')
-              .format(DateTime.fromMillisecondsSinceEpoch(timestamp));
-        }
+  @override
+  State<DetailedAppListCard> createState() => _DetailedAppListCardState();
+}
 
-        final displayedApps = isExpanded ? detailedApps : detailedApps.take(5).toList();
+class _DetailedAppListCardState extends State<DetailedAppListCard> {
+  bool isExpanded = false;
 
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  String _formatDuration(int milliseconds) {
+    final minutes = milliseconds ~/ 60000;
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    return hours > 0 ? '${hours}h ${remainingMinutes}m' : '${remainingMinutes}m';
+  }
+
+  String _formatTimestamp(int timestamp) {
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return DateFormat('h:mm a').format(dateTime);
+    }
+  }
+
+  String _formatTimeOnly(int timestamp) {
+    return DateFormat('h:mm a')
+        .format(DateTime.fromMillisecondsSinceEpoch(timestamp));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayedApps = isExpanded ? widget.detailedApps : widget.detailedApps.take(5).toList();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Detailed App Usage',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    if (detailedApps.length > 5)
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            isExpanded = !isExpanded;
-                          });
-                        },
-                        child: Text(
-                          isExpanded ? 'Show Less' : 'Show All',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                  ],
+                const Text(
+                  'Detailed App Usage',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 16),
-                if (detailedApps.isEmpty)
-                  const Center(
+                if (widget.detailedApps.length > 5)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        isExpanded = !isExpanded;
+                      });
+                    },
                     child: Text(
-                      'No app usage data available',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                else
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 300),
-                    child: Column(
-                      children: displayedApps.map((app) => Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Colors.grey.withOpacity(0.2),
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: ChartColors.getColor(app['package'].hashCode)
-                                    .withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  app['name'][0].toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        ChartColors.getColor(app['package'].hashCode),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        app['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        _formatDuration(app['usage']),
-                                        style: const TextStyle(
-                                          color: Colors.blue,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Opens: ${app['opens']}',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        'First: ${_formatTimeOnly(app['firstOpen'])}',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Last: ${_formatTimestamp(app['lastUsed'])}',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )).toList(),
+                      isExpanded ? 'Show Less' : 'Show All',
+                      style: const TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
               ],
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 16),
+            if (widget.detailedApps.isEmpty)
+              const Center(
+                child: Text(
+                  'No app usage data available',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
+            else
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                child: Column(
+                  children: displayedApps.map((app) => Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: ChartColors.getColor(app['package'].hashCode)
+                                .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              app['name'][0].toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: ChartColors.getColor(app['package'].hashCode),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    app['name'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDuration(app['usage']),
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Opens: ${app['opens']}',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    'First: ${_formatTimeOnly(app['firstOpen'])}',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Last: ${_formatTimestamp(app['lastUsed'])}',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

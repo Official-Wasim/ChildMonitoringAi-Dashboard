@@ -43,9 +43,8 @@ Future<void> initializeLocalNotifications() async {
 Future<void> setupFlutterNotifications() async {
   try {
     final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidImplementation != null) {
       await androidImplementation.createNotificationChannel(channel);
@@ -59,7 +58,8 @@ Future<void> setupFlutterNotifications() async {
 // Add this function to handle notification tap
 Future<void> onNotificationTap(RemoteMessage message) async {
   if (message.data['screen'] != null) {
-    NavigationService.navigatorKey.currentState?.pushNamed(message.data['screen']);
+    NavigationService.navigatorKey.currentState
+        ?.pushNamed(message.data['screen']);
   }
 }
 
@@ -114,10 +114,10 @@ Future<void> showNotification(RemoteMessage message) async {
 Future<void> initializeFirebaseMessaging() async {
   try {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
-    
+
     // Request permission first
     await _requestNotificationPermissions();
-    
+
     // Set foreground notification presentation options
     await messaging.setForegroundNotificationPresentationOptions(
       alert: true,
@@ -145,7 +145,7 @@ Future<void> initializeFirebaseMessaging() async {
               channel.id,
               channel.name,
               channelDescription: channel.description,
-              icon: '@mipmap/ic_launcher', // Use app icon 
+              icon: '@mipmap/ic_launcher', // Use app icon
               importance: Importance.max,
               priority: Priority.high,
               showWhen: true,
@@ -161,24 +161,26 @@ Future<void> initializeFirebaseMessaging() async {
         );
       }
     });
-    
+
     // Handle background messages
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    
+
     // Handle notification tap when app is in background
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('Notification tapped in background!');
       if (message.data['screen'] != null) {
-        NavigationService.navigatorKey.currentState?.pushNamed(message.data['screen']);
+        NavigationService.navigatorKey.currentState
+            ?.pushNamed(message.data['screen']);
       }
     });
-    
+
     // Handle notification when app is terminated
     RemoteMessage? initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) {
       debugPrint('Notification tapped in terminated state!');
       if (initialMessage.data['screen'] != null) {
-        NavigationService.navigatorKey.currentState?.pushNamed(initialMessage.data['screen']);
+        NavigationService.navigatorKey.currentState
+            ?.pushNamed(initialMessage.data['screen']);
       }
     }
 
@@ -192,20 +194,20 @@ Future<void> initializeFirebaseMessaging() async {
       updateFCMToken(token);
       debugPrint('FCM Token refreshed');
     });
-
   } catch (e) {
     debugPrint('Error initializing Firebase Messaging: $e');
   }
 }
 
 class NavigationService {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 }
 
 // Add this new function after NavigationService class
 Future<void> updateFCMToken(String? token) async {
   if (token == null) return;
-  
+
   try {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -235,13 +237,14 @@ Future<void> _requestNotificationPermissions() async {
       announcement: true,
       carPlay: true,
     );
-    
+
     debugPrint('User granted permission: ${settings.authorizationStatus}');
 
     // Request local notification permissions for iOS
     if (Platform.isIOS) {
       await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
           ?.requestPermissions(
             alert: true,
             badge: true,
@@ -260,22 +263,23 @@ void main() async {
 
   try {
     await Firebase.initializeApp();
-    
+
     // Initialize Connectivity plugin
     await Connectivity().checkConnectivity();
-    
+
     // Initialize local notifications first
     await initializeLocalNotifications();
     await setupFlutterNotifications();
-    
+
     // Then initialize Firebase Messaging
     await initializeFirebaseMessaging();
-    
+
     // Handle notification launch
     final NotificationAppLaunchDetails? launchDetails =
         await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp ?? false) {
-      debugPrint('App launched from notification: ${launchDetails?.notificationResponse?.payload}');
+      debugPrint(
+          'App launched from notification: ${launchDetails?.notificationResponse?.payload}');
     }
   } catch (e) {
     debugPrint('Error in initialization: $e');
@@ -311,7 +315,7 @@ class _MyAppState extends State<MyApp> {
         '/AuthScreen': (context) => AuthScreen(),
         '/DashboardScreen': (context) => DashboardScreen(),
         '/InstantMessagingAppsScreen': (context) =>
-            InstantMessagingAppsScreen(phoneModel: 'Unknown'),
+            const InstantMessagingAppsScreen(phoneModel: 'Unknown'),
       },
     );
   }
@@ -324,10 +328,10 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           debugPrint('Error in authStateChanges: ${snapshot.error}');
-          return Center(child: Text('Something went wrong'));
+          return const Center(child: Text('Something went wrong'));
         } else if (snapshot.hasData) {
           return DashboardScreen(); // User is logged in
         } else {

@@ -4,6 +4,7 @@ import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test/theme/theme.dart';
 import 'instant_messaging_apps.dart';
 import 'sms_history_screen.dart';
 import 'call_history_screen.dart';
@@ -339,328 +340,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _connectionInfo;
   String? _chargingStatus;
 
-  // Update this method to also update the map preview
-  Future<void> _fetchRefreshResults() async {
-    if (_selectedDevice == 'Select Device') return;
-
-    try {
-      final User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        DatabaseReference refreshRef = FirebaseDatabase.instance.reference().child(
-            'users/${user.uid}/phones/$_selectedDevice/on_refresh/refresh_result');
-
-        final event = await refreshRef.once();
-        if (event.snapshot.value != null) {
-          final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          _safeSetState(() {
-            _isConnected = data['isConnected'] as bool?;
-            _batteryLevel = data['batteryLevel'] as int?;
-            _chargingStatus = data['chargingStatus']?.toString();
-
-            // Update location data and map preview
-            if (data['location_latitude'] != null &&
-                data['location_longitude'] != null) {
-              _lastLocationLatitude =
-                  (data['location_latitude'] as num?)?.toDouble();
-              _lastLocationLongitude =
-                  (data['location_longitude'] as num?)?.toDouble();
-              _lastLocationAccuracy =
-                  (data['location_accuracy'] as num?)?.toDouble();
-              _lastLocationTimestamp = data['location_timestamp'] != null
-                  ? DateTime.fromMillisecondsSinceEpoch(
-                      data['location_timestamp'])
-                  : null;
-
-              // Update current location for map preview
-              _currentLocation =
-                  LatLng(_lastLocationLatitude!, _lastLocationLongitude!);
-              _hasLocationData = true;
-
-              // Move map to new location
-              if (mounted) {
-                _mapController.move(_currentLocation, 15);
-                setState(() {});
-              }
-
-              _fetchAddressWithRetry();
-            }
-
-            _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(
-                data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch);
-            _connectionType = data['connectionType']?.toString();
-            _connectionInfo = data['connectionInfo']?.toString();
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching refresh results: $e');
-    }
+  // Add this method to reset device-specific data
+  void _resetDeviceData() {
+    _safeSetState(() {
+      _isConnected = null;
+      _batteryLevel = null;
+      _chargingStatus = null;
+      _lastRefreshTime = null;
+      _connectionType = null;
+      _connectionInfo = null;
+      _lastLocationLatitude = null;
+      _lastLocationLongitude = null;
+      _lastLocationAccuracy = null;
+      _lastLocationTimestamp = null;
+      _currentAddress = 'Waiting for location...';
+      _hasLocationData = false;
+      _currentLocation = LatLng(0, 0);
+    });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-    final expandedHeight = screenSize.height * 0.62;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              backgroundGradientStart,
-              backgroundGradientEnd,
-            ],
-            stops: const [0.0, 1.0],
-          ),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: NestedScrollView(
-                headerSliverBuilder:
-                    (BuildContext context, bool innerBoxIsScrolled) {
-                  return [
-                    SliverAppBar(
-                      expandedHeight: MediaQuery.of(context).size.height * 0.56,
-                      toolbarHeight: kToolbarHeight,
-                      floating: false,
-                      pinned: true,
-                      elevation: 0,
-                      flexibleSpace: LayoutBuilder(
-                        builder:
-                            (BuildContext context, BoxConstraints constraints) {
-                          return Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [primaryColor, secondaryColor],
-                                  ),
-                                  borderRadius: BorderRadius.only(
-                                    bottomLeft: Radius.circular(30),
-                                    bottomRight: Radius.circular(30),
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: primaryColor.withOpacity(0.2),
-                                      blurRadius: 12,
-                                      offset: Offset(0, 6),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              FlexibleSpaceBar(
-                                background: SafeArea(
-                                  child: SingleChildScrollView(
-                                    physics: NeverScrollableScrollPhysics(),
-                                    child: Padding(
-                                      padding: EdgeInsets.only(
-                                        top: kToolbarHeight,
-                                        bottom: 2,
-                                        left: 16,
-                                        right: 16,
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _buildWelcomeSection(),
-                                          SizedBox(
-                                              height: screenSize.height * 0.01),
-                                          _buildStatusSection(),
-                                          SizedBox(
-                                              height: screenSize.height * 0),
-                                          _buildLocationCard(context),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                collapseMode: CollapseMode.pin,
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      backgroundColor: Colors.transparent,
-                      title: const Text(
-                        'Dashboard',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      centerTitle: true,
-                      leading: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: CircleAvatar(
-                          radius: 15,
-                          backgroundColor: Colors.white,
-                          child: Text(
-                            'U',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: primaryColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                      actions: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Container(
-                            constraints: const BoxConstraints(minWidth: 120),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _devices.contains(_selectedDevice)
-                                    ? _selectedDevice
-                                    : 'Select Device',
-                                icon: const Icon(Icons.phone_android,
-                                    color: Colors.white),
-                                dropdownColor: primaryColor,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                onChanged: (String? newValue) async {
-                                  if (newValue != null &&
-                                      newValue != _selectedDevice &&
-                                      _devices.contains(newValue)) {
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    await prefs.setString(
-                                        SELECTED_DEVICE_KEY, newValue);
-                                    setState(() {
-                                      _selectedDevice = newValue;
-                                    });
-                                    await _fetchDeviceData(newValue);
-                                  }
-                                },
-                                items: _devices.map<DropdownMenuItem<String>>(
-                                    (String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(
-                                      value.length > 10
-                                          ? '${value.substring(0, 10)}...'
-                                          : value,
-                                      style: TextStyle(
-                                        color: value == 'Select Device'
-                                            ? Colors.white70
-                                            : Colors.white,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ];
-                },
-                body: RefreshIndicator(
-                  onRefresh: () async {
-                    await _trackRefreshRequest();
-                    await _fetchDevices();
-                    await _fetchAddress();
-                    if (_selectedDevice != 'Select Device') {
-                      await _fetchDeviceData(_selectedDevice);
-                    }
-                  },
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Text(
-                                'Dashboard',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                'See All',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          _buildDashboardGrid(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: CurvedNavigationBar(
-        key: _bottomNavigationKey,
-        index: 0,
-        items: [
-          CurvedNavigationBarItem(
-            child: Icon(Icons.home_outlined, color: Colors.black87),
-            label: 'Home',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.history, color: Colors.black87),
-            label: 'Recent',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.phone_android_outlined, color: Colors.black87),
-            label: 'Remote',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.bar_chart, color: Colors.black87),
-            label: 'Stats',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.settings, color: Colors.black87),
-            label: 'Settings',
-          ),
-        ],
-        color: surfaceColor,
-        buttonBackgroundColor: Colors.white,
-        backgroundColor: primaryColor,
-        animationCurve: Curves.easeInOutCubic,
-        animationDuration: const Duration(milliseconds: 800),
-        onTap: (index) {
-          _handleNavigation(index);
-        },
-        letIndexChange: (index) => true,
-      ),
-    );
-  }
-
-  // Fetch data according to the selected device node
+  // Update _fetchDeviceData method to handle device-specific data
   Future<void> _fetchDeviceData(String device) async {
-    // Cancel any existing subscription
     await _deviceDataSubscription?.cancel();
 
     if (device == 'Select Device') {
+      _resetDeviceData();
       _safeSetState(() {
         _counts = {
           'sms': 0,
@@ -687,6 +391,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // Fetch initial refresh results for the new device
+        await _fetchRefreshResults();
+
         if (_isInitialLoad || device != _selectedDevice) {
           await _trackRefreshRequest();
           _isInitialLoad = false;
@@ -805,6 +512,389 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  // Update _updateAllData method to ensure proper order of updates
+  Future<void> _updateAllData(String deviceId) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingData = true;
+    });
+
+    try {
+      // Reset previous device data first
+      _resetDeviceData();
+
+      // Then fetch new device data
+      await _fetchDeviceData(deviceId);
+
+      // Update refresh results for new device
+      await _fetchRefreshResults();
+
+      // Trigger a refresh request for the new device
+      await _trackRefreshRequest();
+    } catch (e) {
+      debugPrint('Error updating device data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingData = false;
+        });
+      }
+    }
+  }
+
+  // Update _fetchRefreshResults to be more device-specific
+  Future<void> _fetchRefreshResults() async {
+    if (_selectedDevice == 'Select Device') {
+      _resetDeviceData();
+      return;
+    }
+
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final refreshRef = FirebaseDatabase.instance.reference().child(
+            'users/${user.uid}/phones/$_selectedDevice/on_refresh/refresh_result');
+
+        final event = await refreshRef.once();
+        if (event.snapshot.value != null) {
+          final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+          _updateDeviceStatus(data);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching refresh results: $e');
+    }
+  }
+
+  // Add new method to update device status
+  void _updateDeviceStatus(Map<String, dynamic> data) {
+    _safeSetState(() {
+      _isConnected = data['isConnected'] as bool?;
+      _batteryLevel = data['batteryLevel'] as int?;
+      _chargingStatus = data['chargingStatus']?.toString();
+      _connectionType = data['connectionType']?.toString();
+      _connectionInfo = data['connectionInfo']?.toString();
+      _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(
+          data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch);
+
+      // Update location data if available
+      if (data['location_latitude'] != null &&
+          data['location_longitude'] != null) {
+        _lastLocationLatitude = (data['location_latitude'] as num?)?.toDouble();
+        _lastLocationLongitude =
+            (data['location_longitude'] as num?)?.toDouble();
+        _lastLocationAccuracy = (data['location_accuracy'] as num?)?.toDouble();
+        _lastLocationTimestamp = data['location_timestamp'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(data['location_timestamp'])
+            : null;
+
+        _currentLocation =
+            LatLng(_lastLocationLatitude!, _lastLocationLongitude!);
+        _hasLocationData = true;
+
+        if (mounted) {
+          _mapController.move(_currentLocation, 15);
+          _fetchAddressWithRetry();
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              backgroundGradientStart,
+              backgroundGradientEnd,
+            ],
+            stops: const [0.0, 1.0],
+          ),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  // Fixed Extended AppBar
+                  Container(
+                    height: screenSize.height * 0.56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [primaryColor, secondaryColor],
+                      ),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(30),
+                        bottomRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.2),
+                          blurRadius: 12,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Main Content
+                  Column(
+                    children: [
+                      // App Bar
+                      SafeArea(
+                        child: AppBar(
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          title: const Text(
+                            'Dashboard',
+                            style: TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          centerTitle: true,
+                          leading: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: CircleAvatar(
+                              radius: 15,
+                              backgroundColor: Colors.white,
+                              child: Text(
+                                'U',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          actions: [
+                            _buildDeviceDropdown(),
+                          ],
+                        ),
+                      ),
+
+                      // Fixed Content
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Column(
+                          children: [
+                            _buildWelcomeSection(),
+                            SizedBox(
+                                height: screenSize.height *
+                                    0.005), // Reduced from 0.01
+                            _buildStatusSection(),
+                            SizedBox(
+                                height: screenSize.height *
+                                    0.005), // Reduced from 0.01
+                            _buildLocationCard(context),
+                          ],
+                        ),
+                      ),
+
+                      // Scrollable Dashboard Grid
+                      Expanded(
+                        child: Column(
+                          children: [
+                            SizedBox(height: 16), // Added vertical gap
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0, vertical: 8.0),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: const [
+                                  Text(
+                                    'Dashboard',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    'See All',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppTheme.primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Scrollable grid with existing style
+                            Expanded(
+                              child: RefreshIndicator(
+                                onRefresh: () async {
+                                  await _trackRefreshRequest();
+                                  await _fetchDevices();
+                                  await _fetchAddress();
+                                  if (_selectedDevice != 'Select Device') {
+                                    await _fetchDeviceData(_selectedDevice);
+                                  }
+                                },
+                                child: SingleChildScrollView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16.0),
+                                    child: _buildDashboardGrid(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildDeviceDropdown() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 120),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _devices.contains(_selectedDevice)
+                ? _selectedDevice
+                : 'Select Device',
+            icon: const Icon(Icons.phone_android, color: Colors.white),
+            dropdownColor: primaryColor,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            onChanged: (String? newValue) async {
+              if (newValue != null &&
+                  newValue != _selectedDevice &&
+                  _devices.contains(newValue)) {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString(SELECTED_DEVICE_KEY, newValue);
+                setState(() {
+                  _selectedDevice = newValue;
+                });
+
+                // Update all relevant data when device changes
+                await _updateAllData(newValue);
+              }
+            },
+            items: _devices.map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(
+                  value.length > 10 ? '${value.substring(0, 10)}...' : value,
+                  style: TextStyle(
+                    color: value == 'Select Device'
+                        ? Colors.white70
+                        : Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Update all data for a specific device
+  Future<void> _refreshDeviceData(String deviceId) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingData = true;
+    });
+
+    try {
+      // Reset previous device data first
+      _resetDeviceData();
+
+      // Then fetch new device data
+      await _fetchDeviceData(deviceId);
+
+      // Update refresh results for new device
+      await _fetchRefreshResults();
+
+      // Trigger a refresh request for the new device
+      await _trackRefreshRequest();
+
+      // Update location data and address
+      if (_hasLocationData) {
+        await _fetchAddressWithRetry();
+      }
+    } catch (e) {
+      debugPrint('Error updating device data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingData = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return CurvedNavigationBar(
+      key: _bottomNavigationKey,
+      index: 0,
+      items: [
+        CurvedNavigationBarItem(
+          child: Icon(Icons.home_outlined, color: Colors.black87),
+          label: 'Home',
+        ),
+        CurvedNavigationBarItem(
+          child: Icon(Icons.history, color: Colors.black87),
+          label: 'Recent',
+        ),
+        CurvedNavigationBarItem(
+          child: Icon(Icons.phone_android_outlined, color: Colors.black87),
+          label: 'Remote',
+        ),
+        CurvedNavigationBarItem(
+          child: Icon(Icons.bar_chart, color: Colors.black87),
+          label: 'Stats',
+        ),
+        CurvedNavigationBarItem(
+          child: Icon(Icons.settings, color: Colors.black87),
+          label: 'Settings',
+        ),
+      ],
+      color: surfaceColor,
+      buttonBackgroundColor: Colors.white,
+      backgroundColor: primaryColor,
+      animationCurve: Curves.easeInOutCubic,
+      animationDuration: const Duration(milliseconds: 800),
+      onTap: (index) {
+        _handleNavigation(index);
+      },
+      letIndexChange: (index) => true,
+    );
+  }
+
   Widget _buildWelcomeSection() {
     String? displayConnectionType;
     String? displayConnectionInfo;
@@ -818,7 +908,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 4, vertical: 2), // Reduced vertical padding from 4
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -830,7 +921,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.white70,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1), // Reduced from 2
           Text(
             _username,
             style: const TextStyle(
@@ -839,7 +930,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2), // Reduced from 4
           Row(
             children: [
               Container(
@@ -956,7 +1047,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildStatusCard(context, Icons.battery_charging_full, 'Battery'),
           ],
         ),
-        SizedBox(height: screenSize.height * 0.015),
+        SizedBox(height: screenSize.height * 0.008), // Reduced from 0.015
       ],
     );
   }
@@ -992,8 +1083,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       },
       child: Container(
-        height: screenSize.height * 0.25, // Responsive height
-        padding: EdgeInsets.all(screenSize.width * 0.04),
+        height: screenSize.height * 0.22, // Reduced from 0.25
+        padding: EdgeInsets.all(screenSize.width * 0.03), // Reduced from 0.04
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(12),
@@ -1035,7 +1126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2), // Reduced from 4
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -1126,7 +1217,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8), // Reduced from 12
             Row(
               children: [
                 Expanded(
@@ -1185,7 +1276,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: 12,
-      mainAxisSpacing: 6,
+      mainAxisSpacing: 12, // Increased from 6 for better spacing
       childAspectRatio: 2.1,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1279,10 +1370,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       statusColor = _isConnected! ? Colors.green : Colors.red;
     } else if (isBatteryCard && _batteryLevel != null) {
       String chargingIndicator = '';
-      bool isCharging = _chargingStatus != null && 
-                       _chargingStatus!.toLowerCase().contains('charging') &&
-                       !_chargingStatus!.toLowerCase().contains('discharging');
-      
+      bool isCharging = _chargingStatus != null &&
+          _chargingStatus!.toLowerCase().contains('charging') &&
+          !_chargingStatus!.toLowerCase().contains('discharging');
+
       if (isCharging) {
         statusIcon = Icons.battery_charging_full;
         chargingIndicator = '⚡';

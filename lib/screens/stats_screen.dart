@@ -100,8 +100,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadSelectedDevice(); // Add this line
-    _initializeUser();
+    _initializeData(); // Replace _loadSelectedDevice() with this
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {});
@@ -109,7 +108,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     });
   }
 
-  Future<void> _initializeUser() async {
+  Future<void> _initializeData() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
@@ -119,7 +118,24 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
       final user = _auth.currentUser;
       if (user != null) {
         _userId = user.uid;
-        await _fetchDevices();
+
+        // First try to load from SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        final savedDevice = prefs.getString('selected_device');
+
+        if (savedDevice != null) {
+          setState(() {
+            _selectedPhoneModel = savedDevice;
+            _phoneModels = [savedDevice]; // Initialize with saved device
+          });
+          // Fetch data for the saved device
+          await _fetchStatsData();
+          // Then fetch full device list in background
+          _fetchDevices(savedDevice);
+        } else {
+          // If no saved device, fetch from database
+          await _fetchDevices(null);
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -128,7 +144,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
         }
       }
     } catch (e) {
-      debugPrint('Error initializing user: $e');
+      debugPrint('Error initializing data: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to fetch user data.')),
@@ -143,39 +159,30 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     }
   }
 
-  Future<void> _loadSelectedDevice() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedDevice = prefs.getString('selected_device');
-    if (savedDevice != null && mounted) {
-      setState(() {
-        _selectedPhoneModel = savedDevice;
-      });
-    }
-  }
-
-  Future<void> _fetchDevices() async {
+  Future<void> _fetchDevices(String? currentDevice) async {
     if (_userId == null || !mounted) return;
 
     try {
       final phonesSnapshot =
           await _databaseRef.child('users/$_userId/phones').get();
       if (phonesSnapshot.exists) {
-        final prefs = await SharedPreferences.getInstance();
-        final savedDevice = prefs.getString('selected_device');
+        final devices = phonesSnapshot.children.map((e) => e.key!).toList();
 
         if (mounted) {
           setState(() {
-            _phoneModels = phonesSnapshot.children.map((e) => e.key!).toList();
-            // Use saved device if available and valid, otherwise use first device
-            if (savedDevice != null && _phoneModels.contains(savedDevice)) {
-              _selectedPhoneModel = savedDevice;
-            } else {
-              _selectedPhoneModel =
-                  _phoneModels.isNotEmpty ? _phoneModels.first : null;
+            _phoneModels = devices;
+            // Only update selected device if none is currently selected
+            if (_selectedPhoneModel == null) {
+              _selectedPhoneModel = devices.isNotEmpty ? devices.first : null;
+            } else if (currentDevice != null &&
+                !devices.contains(currentDevice)) {
+              // If current device is not in the list, switch to first available
+              _selectedPhoneModel = devices.isNotEmpty ? devices.first : null;
             }
           });
-          if (_selectedPhoneModel != null) {
-            _fetchStatsData(); // Fetch initial data for the first device
+
+          if (_selectedPhoneModel != null && currentDevice == null) {
+            _fetchStatsData(); // Only fetch data if no current device
           }
         }
       }
@@ -397,95 +404,98 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
             ),
           ),
         ),
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: AppTheme.backgroundGradient,
-          ),
-          child: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return Column(
-                  children: [
-                    Container(
-                      margin: EdgeInsets.symmetric(
-                          horizontal: constraints.maxWidth * 0.04,
-                          vertical: constraints.maxWidth * 0.02),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.withOpacity(0.08),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Theme(
-                        data: Theme.of(context).copyWith(
-                          highlightColor: Colors.transparent,
-                          splashColor: Colors.transparent,
-                        ),
-                        child: TabBar(
-                          controller: _tabController,
-                          isScrollable: true, // Changed to false
-                          indicator: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.blue.shade400,
-                                Colors.blue.shade600,
+        body: _isLoading
+            ? _buildLoadingIndicator()
+            : Container(
+                decoration: BoxDecoration(
+                  gradient: AppTheme.backgroundGradient,
+                ),
+                child: SafeArea(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Column(
+                        children: [
+                          Container(
+                            margin: EdgeInsets.symmetric(
+                                horizontal: constraints.maxWidth * 0.04,
+                                vertical: constraints.maxWidth * 0.02),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(25),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.blue.withOpacity(0.08),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 4),
+                                ),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.blue.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
+                            child: Theme(
+                              data: Theme.of(context).copyWith(
+                                highlightColor: Colors.transparent,
+                                splashColor: Colors.transparent,
                               ),
-                            ],
+                              child: TabBar(
+                                controller: _tabController,
+                                isScrollable: true, // Changed to false
+                                indicator: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.blue.shade400,
+                                      Colors.blue.shade600,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.blue.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                labelStyle: const TextStyle(
+                                  fontSize: 13, // Reduced font size
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3, // Reduced letter spacing
+                                ),
+                                unselectedLabelStyle: const TextStyle(
+                                  fontSize: 12, // Reduced font size
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                indicatorSize: TabBarIndicatorSize.tab,
+                                labelColor: Colors.white,
+                                unselectedLabelColor: Colors.grey[600],
+                                indicatorPadding: const EdgeInsets.all(4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 6,
+                                ),
+                                tabs: [
+                                  _buildTab(
+                                      Icons.dashboard_outlined, 'Overview'),
+                                  _buildTab(Icons.message_outlined, 'Chats'),
+                                  _buildTab(Icons.apps_outlined, 'Apps'),
+                                ],
+                              ),
+                            ),
                           ),
-                          labelStyle: const TextStyle(
-                            fontSize: 13, // Reduced font size
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3, // Reduced letter spacing
+                          Expanded(
+                            child: TabBarView(
+                              controller: _tabController,
+                              children: [
+                                _buildOverviewTab(constraints),
+                                _buildCommunicationTab(constraints),
+                                _buildAppStatsTab(constraints),
+                              ],
+                            ),
                           ),
-                          unselectedLabelStyle: const TextStyle(
-                            fontSize: 12, // Reduced font size
-                            fontWeight: FontWeight.w500,
-                          ),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          labelColor: Colors.white,
-                          unselectedLabelColor: Colors.grey[600],
-                          indicatorPadding: const EdgeInsets.all(4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 6,
-                          ),
-                          tabs: [
-                            _buildTab(Icons.dashboard_outlined, 'Overview'),
-                            _buildTab(Icons.message_outlined, 'Chats'),
-                            _buildTab(Icons.apps_outlined, 'Apps'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildOverviewTab(constraints),
-                          _buildCommunicationTab(constraints),
-                          _buildAppStatsTab(constraints),
                         ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
         bottomNavigationBar: CurvedNavigationBar(
           key: _bottomNavigationKey,
           index: _page,
@@ -572,6 +582,146 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     );
   }
 
+  Widget _buildLoadingIndicator() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: AppTheme.backgroundGradient,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Loading statistics...',
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverviewTab(BoxConstraints constraints) {
+    final isTablet = constraints.maxWidth > 600;
+    final padding = constraints.maxWidth * 0.04;
+
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: EdgeInsets.all(padding),
+      children: [
+        StatsCard.buildQuickStats(
+          context: context,
+          callStats: _callStats,
+          totalMessagesCount: _totalMessagesCount,
+          messageTrend: _messageTrend,
+          callTrend: _callTrend,
+          showTrendInfo: _showTrendInfo,
+          constraints: constraints,
+          screenTimeMinutes: _screenTimeMinutes, // Add this
+          screenTimeTrend: _screenTimeTrend,
+          appsUsed: _appsUsed, // Add this
+          appsUsedTrend: _appsUsedTrend,
+        ),
+        SizedBox(height: padding),
+        StatsCard.buildScreenTimeCard(_screenTimeData),
+        SizedBox(height: padding),
+        StatsCard.buildWebVisitsPieChart(
+            _webVisitsData, _isLoading), // Changed from Row to vertical layout
+        SizedBox(height: padding),
+        StatsCard.buildCallsPieChart(
+            _callStats), // Changed from Row to vertical layout
+        SizedBox(height: padding),
+        StatsCard.buildDigitalWellbeingCard(),
+        SizedBox(height: padding),
+        StatsCard.buildTopAppsCard(_topApps),
+      ],
+    );
+  }
+
+  Widget _buildCommunicationTab(BoxConstraints constraints) {
+    final padding = constraints.maxWidth * 0.04;
+
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: padding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: constraints.maxWidth - padding * 2,
+              child: StatsCard.buildCommunicationStats(
+                messageCount: _totalMessagesCount,
+                callCount: _callStats['totalCalls'] ?? 0,
+                contactCount: _callDetails.length,
+              ),
+            ),
+            SizedBox(height: padding),
+            StatsCard.buildSmsStatsCard(),
+            SizedBox(height: padding),
+            StatsCard.buildMessagingAppsCard(),
+            SizedBox(height: padding),
+            StatsCard.buildWebsiteStatsCard(),
+            SizedBox(height: padding),
+            StatsCard.buildCallHistoryCard(),
+            SizedBox(height: padding),
+            StatsCard.buildContactsAnalysisCard(),
+            SizedBox(height: padding),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppStatsTab(BoxConstraints constraints) {
+    final padding = constraints.maxWidth * 0.04;
+    final appOpensCount = (overview?['appOpens'] ?? 0) as int;
+
+    if (_isLoading) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: EdgeInsets.all(padding),
+      children: [
+        StatsCard.buildAppUsageSummary(
+          appOpens: appOpensCount,
+          appsUsed: _appsUsed,
+        ),
+        SizedBox(height: padding),
+        StatsCard.buildTopAppsUsageChart(_topApps), // Pass the real data
+        SizedBox(height: padding),
+        StatsCard.buildDetailedAppList(_detailedAppUsage), // Update this line
+      ],
+    );
+  }
+
   Widget _buildDeviceSelector() {
     return Container(
       decoration: BoxDecoration(
@@ -610,107 +760,20 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
               ),
             );
           }).toList(),
-          onChanged: (value) async {
-            if (value != null) {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('selected_device', value);
-              setState(() {
-                _selectedPhoneModel = value;
-              });
-              _fetchStatsData();
-            }
-          },
+          onChanged: !_isLoading
+              ? (value) async {
+                  if (value != null) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('selected_device', value);
+                    setState(() {
+                      _selectedPhoneModel = value;
+                    });
+                    _fetchStatsData();
+                  }
+                }
+              : null, // Disable dropdown while loading
         ),
       ),
-    );
-  }
-
-  Widget _buildOverviewTab(BoxConstraints constraints) {
-    final isTablet = constraints.maxWidth > 600;
-    final padding = constraints.maxWidth * 0.04;
-
-    return ListView(
-      padding: EdgeInsets.all(padding),
-      children: [
-        StatsCard.buildQuickStats(
-          context: context,
-          callStats: _callStats,
-          totalMessagesCount: _totalMessagesCount,
-          messageTrend: _messageTrend,
-          callTrend: _callTrend,
-          showTrendInfo: _showTrendInfo,
-          constraints: constraints,
-          screenTimeMinutes: _screenTimeMinutes, // Add this
-          screenTimeTrend: _screenTimeTrend,
-          appsUsed: _appsUsed, // Add this
-          appsUsedTrend: _appsUsedTrend,
-        ),
-        SizedBox(height: padding),
-        StatsCard.buildScreenTimeCard(_screenTimeData),
-        SizedBox(height: padding),
-        StatsCard.buildWebVisitsPieChart(
-            _webVisitsData, _isLoading), // Changed from Row to vertical layout
-        SizedBox(height: padding),
-        StatsCard.buildCallsPieChart(
-            _callStats), // Changed from Row to vertical layout
-        SizedBox(height: padding),
-        StatsCard.buildDigitalWellbeingCard(),
-        SizedBox(height: padding),
-        StatsCard.buildTopAppsCard(_topApps),
-      ],
-    );
-  }
-
-  Widget _buildCommunicationTab(BoxConstraints constraints) {
-    final padding = constraints.maxWidth * 0.04;
-
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: padding, vertical: padding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: constraints.maxWidth - padding * 2,
-              child: StatsCard.buildCommunicationStats(
-                messageCount: _totalMessagesCount,
-                callCount: _callStats['totalCalls'] ?? 0,
-                contactCount: _callDetails.length,
-              ),
-            ),
-            SizedBox(height: padding),
-            StatsCard.buildSmsStatsCard(),
-            SizedBox(height: padding),
-            StatsCard.buildMessagingAppsCard(),
-            SizedBox(height: padding),
-            StatsCard.buildWebsiteStatsCard(),
-            SizedBox(height: padding),
-            StatsCard.buildCallHistoryCard(),
-            SizedBox(height: padding),
-            StatsCard.buildContactsAnalysisCard(),
-            SizedBox(height: padding),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAppStatsTab(BoxConstraints constraints) {
-    final padding = constraints.maxWidth * 0.04;
-    final appOpensCount = (overview?['appOpens'] ?? 0) as int;
-
-    return ListView(
-      padding: EdgeInsets.all(padding),
-      children: [
-        StatsCard.buildAppUsageSummary(
-          appOpens: appOpensCount,
-          appsUsed: _appsUsed,
-        ),
-        SizedBox(height: padding),
-        StatsCard.buildTopAppsUsageChart(_topApps), // Pass the real data
-        SizedBox(height: padding),
-        StatsCard.buildDetailedAppList(_detailedAppUsage), // Update this line
-      ],
     );
   }
 

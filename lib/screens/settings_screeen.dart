@@ -143,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     // Initialize all controllers at once
     _initializeControllers();
-    
+
     // Add memory-efficient loading
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeController();
@@ -178,15 +178,15 @@ class _SettingsScreenState extends State<SettingsScreen>
     _locationController.dispose();
     _otherController.dispose();
     _scrollController.dispose();
-    
+
     // Clear any cached data
     _controller = null;
-    
+
     // Remove listeners
     if (mounted) {
       _removeListeners();
     }
-    
+
     super.dispose();
   }
 
@@ -310,7 +310,8 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildSettingTile(
       String title, String subtitle, String settingKey, IconData icon) {
-    final bool isEnabled = !_isLoading && (_controller?.getSetting(settingKey) ?? false);
+    final bool isEnabled =
+        !_isLoading && (_controller?.getSetting(settingKey) ?? false);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -554,10 +555,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (_isLoading) {
       return Scaffold(
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: AppTheme.backgroundGradient,
           ),
-          child: Center(
+          child: const Center(
             child: CircularProgressIndicator(
               color: AppTheme.primaryColor,
             ),
@@ -587,14 +588,58 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           child: AppBar(
             leading: IconButton(
-              icon: Icon(
+              icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: AppTheme.surfaceColor,
                 size: 22,
               ),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            title: Text('Settings', style: AppTheme.headlineStyle),
+            title: const Text('Settings', style: AppTheme.headlineStyle),
+            actions: [
+              IconButton(
+                icon: const Icon(
+                  Icons.logout_rounded,
+                  color: AppTheme.surfaceColor,
+                  size: 24,
+                ),
+                onPressed: () async {
+                  // Show confirmation dialog
+                  final shouldLogout = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('Logout'),
+                      content: Text('Are you sure you want to logout?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text(
+                            'Logout',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (shouldLogout == true) {
+                    await FirebaseAuth.instance.signOut();
+                    if (mounted) {
+                      // Clear navigation stack and go to auth screen
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/',
+                        (Route<dynamic> route) => false,
+                      );
+                    }
+                  }
+                },
+              ),
+              SizedBox(width: 8),
+            ],
             backgroundColor: Colors.transparent,
             elevation: 0,
           ),
