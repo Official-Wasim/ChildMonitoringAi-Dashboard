@@ -40,15 +40,10 @@ class _InstantMessagingAppsScreenState
         isLoading = true;
       });
 
-      final snapshot = await _messagesRef.get();
-      if (snapshot.value == null) {
-        setState(() {
-          isLoading = false;
-        });
-        return;
-      }
+      // Get today's date in the format used in Firebase
+      final today = DateTime.now().toIso8601String().split('T')[0];
 
-      final messagesMap = snapshot.value as Map<dynamic, dynamic>;
+      final snapshot = await _messagesRef.child(today).get();
       Map<String, int> counts = {
         'WhatsApp': 0,
         'Instagram': 0,
@@ -57,37 +52,30 @@ class _InstantMessagingAppsScreenState
         'Messenger': 0,
       };
 
-      messagesMap.forEach((date, dateData) {
-        if (dateData is Map) {
-          final dateMessages = dateData as Map<dynamic, dynamic>;
-          dateMessages.forEach((platform, messages) {
-            if (messages is Map) {
-              switch (platform.toString().toLowerCase()) {
-                case 'whatsapp':
-                  counts['WhatsApp'] =
-                      (counts['WhatsApp'] ?? 0) + messages.length;
-                  break;
-                case 'instagram':
-                  counts['Instagram'] =
-                      (counts['Instagram'] ?? 0) + messages.length;
-                  break;
-                case 'snapchat':
-                  counts['Snapchat'] =
-                      (counts['Snapchat'] ?? 0) + messages.length;
-                  break;
-                case 'telegram':
-                  counts['Telegram'] =
-                      (counts['Telegram'] ?? 0) + messages.length;
-                  break;
-                case 'messenger':
-                  counts['Messenger'] =
-                      (counts['Messenger'] ?? 0) + messages.length;
-                  break;
-              }
+      if (snapshot.value != null) {
+        final todayMessages = snapshot.value as Map<dynamic, dynamic>;
+        todayMessages.forEach((platform, messages) {
+          if (messages is Map) {
+            switch (platform.toString().toLowerCase()) {
+              case 'whatsapp':
+                counts['WhatsApp'] = messages.length;
+                break;
+              case 'instagram':
+                counts['Instagram'] = messages.length;
+                break;
+              case 'snapchat':
+                counts['Snapchat'] = messages.length;
+                break;
+              case 'telegram':
+                counts['Telegram'] = messages.length;
+                break;
+              case 'messenger':
+                counts['Messenger'] = messages.length;
+                break;
             }
-          });
-        }
-      });
+          }
+        });
+      }
 
       setState(() {
         messageCounts = counts;
@@ -163,6 +151,86 @@ class _InstantMessagingAppsScreenState
     ),
   ];
 
+  void _showComingSoonDialog(BuildContext context, AppInfo app) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: app.color.withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: app.color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    app.icon,
+                    size: 40,
+                    color: app.color,
+                  ),
+                ),
+                SizedBox(height: 20),
+                Text(
+                  "Coming Soon!",
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  "${app.name} integration is under development",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.black54,
+                  ),
+                ),
+                SizedBox(height: 24),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: app.color,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Text(
+                      "Got it!",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -237,33 +305,38 @@ class _InstantMessagingAppsScreenState
                           crossAxisCellCount: 2,
                           child: GestureDetector(
                             onTap: () {
-                              // Navigate to the appropriate screen based on the app name
-                              if (app.name == "Instagram") {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        InstagramMessagesScreen(
-                                            phoneModel: widget.phoneModel),
-                                  ),
-                                );
-                              } else if (app.name == "WhatsApp") {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => MessageScreen(
-                                        phoneModel: widget.phoneModel),
-                                  ),
-                                );
-                              } else if (app.name == "Snapchat") {
-                                // Add this condition
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => SnapchatMessageScreen(
-                                        phoneModel: widget.phoneModel),
-                                  ),
-                                );
+                              switch (app.name) {
+                                case "Instagram":
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          InstagramMessagesScreen(
+                                              phoneModel: widget.phoneModel),
+                                    ),
+                                  );
+                                  break;
+                                case "WhatsApp":
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => MessageScreen(
+                                          phoneModel: widget.phoneModel),
+                                    ),
+                                  );
+                                  break;
+                                case "Snapchat":
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          SnapchatMessageScreen(
+                                              phoneModel: widget.phoneModel),
+                                    ),
+                                  );
+                                  break;
+                                default:
+                                  _showComingSoonDialog(context, app);
                               }
                             },
                             child: AnimatedContainer(

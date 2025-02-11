@@ -1,0 +1,74 @@
+digraph ProjectComponents {
+    rankdir=TB;
+    node [shape=component, style=filled, fillcolor=lightblue];
+    
+    // Main Screens
+    Dashboard [label="DashboardScreen"];
+    StatsScreen [label="StatsScreen"];
+    Settings [label="SettingsScreen"];
+    Recents [label="RecentsScreen"];
+    RemoteControl [label="RemoteControlScreen"];
+    
+    // Features Subcomponents
+    subgraph cluster_features {
+        label="Feature Screens";
+        style=dotted;
+        
+        Calls [label="CallHistoryScreen"];
+        SMS [label="SMSHistoryScreen"];
+        MMS [label="MMSHistoryScreen"];
+        InstantMessaging [label="InstantMessagingApps"];
+        Locations [label="LocationsScreen"];
+        Contacts [label="ContactsScreen"];
+        Apps [label="AppsScreen"];
+        Sites [label="WebVisitHistoryPage"];
+    }
+    
+    // Chart Components
+    subgraph cluster_charts {
+        label="Charts & Stats";
+        style=dotted;
+        
+        StatsCharts [label="StatsChart\nService"];
+        StatsCards [label="StatsCard\nComponents"];
+        ScreenTimeChart;
+        WebVisitsPieChart;
+        CallDistributionPieChart;
+        DetailedAppListCard;
+    }
+
+    // Services
+    subgraph cluster_services {
+        label="Services";
+        style=dotted;
+        
+        ConnectivityService;
+        GeocodingService;
+    }
+    
+    // External Dependencies
+    Flutter [shape=ellipse];
+    Firebase [shape=ellipse];
+    SyncfusionCharts [label="Syncfusion\nFlutter Charts", shape=ellipse];
+    IntlPackage [label="intl Package", shape=ellipse];
+    FlutterMap [label="flutter_map", shape=ellipse];
+    
+    // Navigation Relationships
+    Dashboard -> {StatsScreen Recents RemoteControl Settings};
+    Dashboard -> {Calls SMS MMS InstantMessaging Locations Contacts Apps Sites};
+    
+    // Component Relationships
+    Dashboard -> StatsCards;
+    StatsCards -> {ScreenTimeChart WebVisitsPieChart CallDistributionPieChart DetailedAppListCard};
+    Dashboard -> {ConnectivityService GeocodingService};
+    
+    // Data Flow
+    Firebase -> Dashboard;
+    Firebase -> StatsCharts;
+    
+    // External Dependencies
+    Flutter -> Dashboard;
+    SyncfusionCharts -> {ScreenTimeChart WebVisitsPieChart CallDistributionPieChart};
+    IntlPackage -> StatsCards;
+    FlutterMap -> Dashboard;
+}

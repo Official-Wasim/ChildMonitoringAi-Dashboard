@@ -1,0 +1,163 @@
+digraph AppStateChart {
+    rankdir=LR;
+    node [shape=rectangle, style=rounded, fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    // Authentication States
+    subgraph cluster_auth {
+        label="Authentication Flow";
+        style=dashed;
+        color=blue;
+        
+        AuthWrapper -> AuthScreen [label="not logged in"];
+        AuthWrapper -> DashboardScreen [label="logged in"];
+        AuthScreen -> DashboardScreen [label="login success"];
+    }
+
+    // Main Navigation Flow with Device Selection
+    subgraph cluster_main {
+        label="Main Navigation";
+        style=dashed;
+        color=green;
+        
+        DashboardScreen -> DeviceSelection [label="select device"];
+        DeviceSelection -> {
+            RecentsScreen
+            RemoteControlScreen
+            AdvancedStatsScreen
+            SettingsScreen
+        } [label="device selected"];
+
+        // Navigation Bar Flow
+        RecentsScreen -> DashboardScreen [label="tap Home"];
+        RemoteControlScreen -> DashboardScreen [label="tap Home"];
+        AdvancedStatsScreen -> DashboardScreen [label="tap Home"];
+        SettingsScreen -> DashboardScreen [label="tap Home"];
+    }
+
+    // Settings States with Expanded Features
+    subgraph cluster_settings {
+        label="Settings States";
+        style=dashed;
+        color=orange;
+        
+        SettingsScreen -> {
+            CommunicationSettings
+            LocationSettings
+            NotificationSettings
+            AppMonitoring
+            WebMonitoring
+            SecuritySettings
+        } [label="expand section"];
+
+        // Settings Actions
+        AppMonitoring -> AppUsageLimits [label="set limits"];
+        LocationSettings -> GeofenceSetup [label="add fence"];
+        WebMonitoring -> WebsiteRestrictions [label="set restrictions"];
+        NotificationSettings -> AlertPreferences [label="configure"];
+    }
+
+    // Recents Screen with Detailed States
+    subgraph cluster_recents {
+        label="Recents Activities";
+        style=dashed;
+        color=purple;
+        
+        RecentsScreen -> {
+            NotificationsView
+            LocationTimelineView
+            AppUsageView
+            CallLogsView
+            MessageLogsView
+            WebHistoryView
+        } [label="view section"];
+
+        // Detailed Views
+        LocationTimelineView -> MapView [label="view map"];
+        AppUsageView -> DetailedStats [label="view details"];
+        NotificationsView -> AlertDetails [label="view alert"];
+    }
+
+    // Stats Screen with Enhanced Metrics
+    subgraph cluster_stats {
+        label="Statistical Analysis";
+        style=dashed;
+        color=red;
+        
+        AdvancedStatsScreen -> {
+            ScreenTimeStats
+            CallStats
+            WebsiteStats
+            AppUsageStats
+            MessageStats
+            LocationStats
+        } [label="view stats"];
+
+        // Detailed Analytics
+        ScreenTimeStats -> DailyBreakdown [label="view daily"];
+        CallStats -> CallPatterns [label="analyze"];
+        WebsiteStats -> DomainAnalysis [label="analyze"];
+        AppUsageStats -> CategoryBreakdown [label="view categories"];
+    }
+
+    // Remote Control Features
+    subgraph cluster_remote {
+        label="Remote Controls";
+        style=dashed;
+        color=brown;
+        
+        RemoteControlScreen -> {
+            AppControl
+            LocationTracking
+            ScreenCapture
+            DeviceInfo
+            SystemActions
+        } [label="access feature"];
+
+        // Remote Actions
+        AppControl -> {AppBlock, AppUnblock} [label="manage"];
+        LocationTracking -> LiveLocation [label="track"];
+        SystemActions -> {Restart, Lock, Wipe} [label="execute"];
+    }
+
+    // Notification System
+    subgraph cluster_notifications {
+        label="Alert System";
+        style=dashed;
+        color=gray;
+        
+        NotificationTap [shape=diamond];
+        Firebase -> NotificationTap [label="receive\nnotification"];
+        NotificationTap -> DashboardScreen [label="app closed"];
+        NotificationTap -> {
+            RecentsScreen
+            SettingsScreen
+            AdvancedStatsScreen
+        } [label="app open"];
+
+        // Alert Types
+        AlertSystem [shape=circle];
+        AlertSystem -> {
+            GeofenceAlert
+            AppInstallAlert
+            WebAccessAlert
+            ScreenTimeAlert
+            UnauthorizedAccessAlert
+        } [label="generate"];
+    }
+
+    // Data Synchronization
+    subgraph cluster_sync {
+        label="Data Sync";
+        style=dashed;
+        color=cyan;
+        
+        FirebaseSync [shape=diamond];
+        DeviceData -> FirebaseSync [label="upload"];
+        FirebaseSync -> {
+            StatsUpdate
+            RecentActivities
+            AlertGeneration
+        } [label="process"];
+    }
+}

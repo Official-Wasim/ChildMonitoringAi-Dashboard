@@ -1,0 +1,104 @@
+@startuml Project Structure
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam backgroundColor transparent
+skinparam componentStyle uml2
+
+' Components
+package "lib" {
+    package "screens" {
+        component auth_screen
+        component dashboard_screen
+        component stats_screen
+        component settings_screen
+        component recents_screen
+        component remote_screen
+        component contacts_screen
+        component map_screen
+        component sites_screen
+        component social_screen
+    }
+
+    package "services" {
+        component stats_service
+        component auth_service
+        component connectivity_service
+        component geocoding_service
+        component settings_service
+    }
+
+    package "models" {
+        component contact_info
+        component location_info
+        component chart_data
+        component stats_model
+        component message_model
+        component website_model
+    }
+
+    package "components/charts" {
+        component stats_chart
+        component stats_cards
+    }
+
+    package "theme" {
+        component app_theme
+        component color_schemes
+        component text_styles
+    }
+}
+
+package "external" {
+    component firebase
+    component flutter_plugins
+}
+
+' Screen Navigation
+auth_screen --> dashboard_screen : navigates
+dashboard_screen --> stats_screen : navigates
+dashboard_screen --> settings_screen : navigates
+dashboard_screen --> recents_screen : navigates
+dashboard_screen --> remote_screen : navigates
+recents_screen --> contacts_screen : navigates
+recents_screen --> map_screen : navigates
+recents_screen --> sites_screen : navigates
+recents_screen --> social_screen : navigates
+
+' Model Usage
+contacts_screen ..> contact_info : uses
+map_screen ..> location_info : uses
+stats_screen ..> chart_data : uses
+stats_screen ..> stats_model : uses
+social_screen ..> message_model : uses
+sites_screen ..> website_model : uses
+
+' Service Usage
+stats_screen ..> stats_service : uses
+auth_screen ..> auth_service : uses
+map_screen ..> geocoding_service : uses
+dashboard_screen ..> connectivity_service : uses
+settings_screen ..> settings_service : uses
+
+' Theme Usage
+screens ..> app_theme : styles
+app_theme --> color_schemes : uses
+app_theme --> text_styles : uses
+
+' Component Usage
+stats_screen ..> stats_chart : displays
+stats_screen ..> stats_cards : displays
+
+' External Dependencies
+services ..> firebase : uses
+auth_service --> firebase : authenticates
+stats_service --> firebase : stores data
+settings_service --> firebase : stores settings
+geocoding_service ..> flutter_plugins : uses maps
+connectivity_service ..> flutter_plugins : uses network
+
+' Data Flow
+models ..> firebase : persists
+services ..> models : manipulates
+
+@enduml

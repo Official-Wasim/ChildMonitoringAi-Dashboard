@@ -7,9 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async'; 
+import 'dart:async';
 import '../services/recents_screen/fetch_recent_data.dart';
-import '../services/stats_screen/fetch_stats_data.dart';  // Add this import
+import '../services/stats_screen/fetch_stats_data.dart'; // Add this import
 import '../theme/theme.dart';
 import 'dashboard_screen.dart';
 import 'settings_screeen.dart';
@@ -22,7 +22,7 @@ class NotificationItem {
   final String id;
   final String title;
   final String body;
-  final String type; 
+  final String type;
   final DateTime timestamp;
 
   NotificationItem({
@@ -179,7 +179,7 @@ class _RecentsScreenState extends State<RecentsScreen>
 
   Future<void> _loadData() async {
     if (_disposed) return;
-    
+
     _safeSetState(() => _isLoading = true);
     try {
       if (_selectedDevice != 'Select Device') {
@@ -192,7 +192,8 @@ class _RecentsScreenState extends State<RecentsScreen>
         _safeSetState(() {
           _screenTimeMinutes = overview['screenTime'];
           _appsUsed = overview['appsUsed'];
-          _alertsCount = overview['alertsCount']; // This will now get the correct count
+          _alertsCount =
+              overview['alertsCount']; // This will now get the correct count
         });
       }
     } finally {
@@ -447,9 +448,8 @@ class _RecentsScreenState extends State<RecentsScreen>
   }
 
   Widget _buildNotificationsSection() {
-    final displayedNotifications = _showAllNotifications 
-        ? notifications 
-        : notifications.take(6).toList();
+    final displayedNotifications =
+        _showAllNotifications ? notifications : notifications.take(6).toList();
     final remainingCount = notifications.length - 6;
 
     return Container(
@@ -486,8 +486,8 @@ class _RecentsScreenState extends State<RecentsScreen>
                     });
                   },
                   child: Text(
-                    _showAllNotifications 
-                        ? 'Show less' 
+                    _showAllNotifications
+                        ? 'Show less'
                         : 'View all ($remainingCount more)',
                     style: GoogleFonts.poppins(
                       color: AppTheme.primaryColor,
@@ -526,7 +526,8 @@ class _RecentsScreenState extends State<RecentsScreen>
               ),
             )
           else
-            ...displayedNotifications.map((notification) => _buildNotificationCard(notification)),
+            ...displayedNotifications
+                .map((notification) => _buildNotificationCard(notification)),
           if (_showAllNotifications && notifications.length > 6)
             Padding(
               padding: const EdgeInsets.only(top: 16),
@@ -1356,13 +1357,196 @@ class _RecentsScreenState extends State<RecentsScreen>
                 _showGeofenceSettings();
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.key),
+              title: const Text('Set Keyword Alerts for messages'),
+              onTap: () {
+                Navigator.pop(context);
+                _showKeywordAlertSettings();
+              },
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Add these new methods after _showActionsMenu
+  void _showKeywordAlertSettings() {
+    final _keywordController = TextEditingController();
+    String _errorMessage = '';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: FutureBuilder<List<String>>(
+          future: PreferencesService.getKeywordAlerts(_selectedDevice),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final keywords = snapshot.data ?? [];
+
+            return StatefulBuilder(
+              builder: (context, setState) => Container(
+                padding: const EdgeInsets.all(24),
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.8,
+                  maxWidth: MediaQuery.of(context).size.width * 0.9,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Keyword Alerts',
+                          style: GoogleFonts.poppins(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    if (_errorMessage.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red[200]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red[700]),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.red[700],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _keywordController,
+                      decoration: InputDecoration(
+                        labelText: 'Add Keyword',
+                        hintText: 'Enter keyword to monitor',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(Icons.add, color: AppTheme.primaryColor),
+                          onPressed: () async {
+                            final keyword = _keywordController.text.trim();
+                            if (keyword.isEmpty) {
+                              setState(() =>
+                                  _errorMessage = 'Please enter a keyword');
+                              return;
+                            }
+                            try {
+                              await PreferencesService.addKeywordAlert(
+                                deviceId: _selectedDevice,
+                                keyword: keyword,
+                              );
+                              _keywordController.clear();
+                              Navigator.pop(context);
+                              _showKeywordAlertSettings();
+                              showMessage('Keyword added successfully');
+                            } catch (e) {
+                              setState(() => _errorMessage = e.toString());
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Monitored Keywords',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: keywords.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.search_off,
+                                      size: 48, color: Colors.grey[400]),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'No keywords added',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: keywords.length,
+                              itemBuilder: (context, index) {
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    leading: Icon(Icons.key,
+                                        color: AppTheme.primaryColor),
+                                    title: Text(keywords[index]),
+                                    trailing: IconButton(
+                                      icon: Icon(Icons.delete_outline,
+                                          color: Colors.red[400]),
+                                      onPressed: () async {
+                                        try {
+                                          await PreferencesService
+                                              .removeKeywordAlert(
+                                            deviceId: _selectedDevice,
+                                            keyword: keywords[index],
+                                          );
+                                          Navigator.pop(context);
+                                          _showKeywordAlertSettings();
+                                          showMessage(
+                                              'Keyword removed successfully');
+                                        } catch (e) {
+                                          setState(() =>
+                                              _errorMessage = e.toString());
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   void _showWebsiteAlertSettings() {
     final _keywordController = TextEditingController();
     final _urlController = TextEditingController();
@@ -2460,4 +2644,3 @@ class _RecentsScreenState extends State<RecentsScreen>
     }
   }
 }
-

@@ -1,0 +1,84 @@
+@startuml Package Diagram
+
+skinparam packageStyle rectangle
+skinparam backgroundColor transparent
+skinparam componentStyle uml2
+
+package "lib" {
+    package "screens" {
+        [dashboard_screen]
+        [call_history_screen]
+        [stats_screen]
+        [remote_commands_screen]
+        [map_screen]
+        [settings_screen]
+        [recents_screen]
+        [sms_history_screen]
+        [mms_history_screen]
+        [contacts_screen]
+        [apps_screen]
+        [sites_screen]
+        [instant_messaging_apps]
+        [locations_screen]
+    }
+
+    package "services" {
+        [stats_screen/fetch_stats_data]
+        [geocoding_service]
+        [connectivity_service]
+    }
+
+    package "models" {
+        [call_info]
+        [location_info]
+    }
+
+    package "components" {
+        package "charts" {
+            [stats_chart]
+            [stats_cards]
+        }
+    }
+
+    package "theme" {
+        [theme]
+    }
+}
+
+package "External_Dependencies" {
+    [firebase_auth]
+    [firebase_database]
+    [flutter_map]
+    [shared_preferences]
+    [curved_labeled_navigation_bar]
+    [connectivity_plus]
+    [intl]
+}
+
+' Relationships
+dashboard_screen --> stats_screen
+dashboard_screen --> remote_commands_screen
+dashboard_screen --> settings_screen
+dashboard_screen --> recents_screen
+
+stats_screen --> [stats_screen/fetch_stats_data]
+stats_screen ..> [stats_chart]
+stats_screen ..> [stats_cards]
+
+remote_commands_screen --> [geocoding_service]
+remote_commands_screen ..> [connectivity_service]
+
+map_screen --> [location_info]
+map_screen ..> [geocoding_service]
+
+call_history_screen --> [call_info]
+
+' External Dependencies
+screens ..> [firebase_auth]
+screens ..> [firebase_database]
+screens ..> [shared_preferences]
+screens ..> [curved_labeled_navigation_bar]
+services ..> [firebase_database]
+map_screen ..> [flutter_map]
+
+@enduml

@@ -1,0 +1,55 @@
+digraph deployment {
+    rankdir=TB;
+    node [shape=box3d];
+    
+    subgraph cluster_parent {
+        label="Parent Device";
+        parent_app [label="Parent Dashboard\n<<application>>\nFlutter UI"];
+        stats_component [label="Stats Component\n<<component>>"];
+        monitoring_ui [label="Monitoring Controls\n<<interface>>"];
+    }
+
+    subgraph cluster_child {
+        label="Child Device";
+        child_service [label="Monitoring Service\n<<service>>"];
+        usage_tracker [label="Usage Tracker\n<<component>>"];
+        
+        subgraph cluster_monitors {
+            label="Activity Monitors";
+            call_monitor [label="Call Monitor\n<<service>>"];
+            sms_monitor [label="SMS Monitor\n<<service>>"];
+            location_monitor [label="Location Monitor\n<<service>>"];
+            app_monitor [label="App Monitor\n<<service>>"];
+            web_monitor [label="Web Monitor\n<<service>>"];
+            social_monitor [label="Social Media Monitor\n<<service>>"];
+        }
+    }
+    
+    subgraph cluster_firebase {
+        label="Firebase Services";
+        auth [label="Authentication\n<<service>>"];
+        realtime_db [label="Realtime Database\n<<database>>"];
+        storage [label="Cloud Storage\n<<storage>>"];
+    }
+
+    subgraph cluster_external {
+        label="External Services";
+        maps_api [label="Google Maps API\n<<service>>"];
+        geocoding [label="Geocoding Service\n<<service>>"];
+    }
+
+    // Connections
+    parent_app -> auth [label="authenticate"];
+    parent_app -> realtime_db [label="read data"];
+    stats_component -> realtime_db [label="fetch stats"];
+    monitoring_ui -> realtime_db [label="send commands"];
+
+    child_service -> realtime_db [label="upload data"];
+    child_service -> storage [label="store media"];
+    usage_tracker -> {call_monitor sms_monitor location_monitor app_monitor web_monitor social_monitor} [label="track"];
+
+    location_monitor -> maps_api [label="get location"];
+    location_monitor -> geocoding [label="reverse geocode"];
+
+    {call_monitor sms_monitor app_monitor web_monitor social_monitor} -> realtime_db [label="sync"];
+}

@@ -3,6 +3,7 @@ import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test/theme/theme.dart';
 import 'instant_messaging_apps.dart';
@@ -567,16 +568,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Add new method to update device status
+  // Add this helper method to check if device is online based on timestamp
+  bool _isDeviceOnline(int? timestamp) {
+    if (timestamp == null) return false;
+    final lastUpdate = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final difference = DateTime.now().difference(lastUpdate);
+    return difference.inMinutes <
+        1; // Consider offline if last update was more than 1 minute ago
+  }
+
+  // Update the _updateDeviceStatus method
   void _updateDeviceStatus(Map<String, dynamic> data) {
     _safeSetState(() {
-      _isConnected = data['isConnected'] as bool?;
+      // Check if device is online based on timestamp
+      final timestamp = data['timestamp'] as int?;
+      _isConnected = _isDeviceOnline(timestamp);
+
       _batteryLevel = data['batteryLevel'] as int?;
       _chargingStatus = data['chargingStatus']?.toString();
       _connectionType = data['connectionType']?.toString();
       _connectionInfo = data['connectionInfo']?.toString();
       _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(
-          data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch);
+          timestamp ?? DateTime.now().millisecondsSinceEpoch);
 
       // Update location data if available
       if (data['location_latitude'] != null &&
@@ -994,7 +1007,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.green.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -1011,7 +1024,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                         child: Icon(
                           Icons.refresh,
-                          size: 12,
+                          size: 14,
                           color: _isRefreshing ? Colors.white38 : Colors.white,
                         ),
                       ),
@@ -1026,7 +1039,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   ),
-                ),
+                )
+                    .animate(onPlay: (controller) => controller.repeat())
+                    .shimmer(duration: 1.seconds),
             ],
           ),
         ],
@@ -1044,7 +1059,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildStatusCard(
                 context, Icons.signal_cellular_alt, 'Online Status'),
             SizedBox(width: screenSize.width * 0.02),
-            _buildStatusCard(context, Icons.battery_charging_full, 'Battery'),
+            _buildStatusCard(context, Icons.battery_6_bar, 'Battery'),
           ],
         ),
         SizedBox(height: screenSize.height * 0.008), // Reduced from 0.015
@@ -1110,7 +1125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.green.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1123,7 +1138,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: Colors.white,
                     ),
                   ),
-                ),
+                )
+                    .animate(onPlay: (controller) => controller.repeat())
+                    .shimmer(duration: 1.seconds),
               ],
             ),
             const SizedBox(height: 2), // Reduced from 4
@@ -1138,7 +1155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         initialCenter:
                             _hasLocationData ? _currentLocation : LatLng(0, 0),
                         initialZoom: _hasLocationData ? 15 : 2,
-                        interactionOptions: InteractionOptions(
+                        interactionOptions: const InteractionOptions(
                           enableScrollWheel: false,
                           enableMultiFingerGestureRace: false,
                           flags: InteractiveFlag.none,

@@ -1,0 +1,104 @@
+sequenceDiagram {
+  // Main Actors & Components
+  actor Parent
+  participant Dashboard
+  participant Auth [label="Firebase Auth"]
+  participant DB [label="Firebase Database"]
+  participant FCM [label="Firebase Messaging"]
+  participant Prefs [label="SharedPreferences"]
+
+  // Authentication Flow
+  group Authentication {
+    Parent -> Dashboard: Open App
+    Dashboard -> Auth: Check Auth State
+    Auth -> Dashboard: Auth Result
+    
+    alt Not Authenticated
+      Dashboard -> Parent: Show Auth Screen 
+      Parent -> Dashboard: Login Credentials
+      Dashboard -> Auth: Sign In Request
+      Auth -> Dashboard: Auth Response
+
+      alt Success
+        Dashboard -> DB: Fetch Selected Device
+        DB -> Dashboard: Device Data
+        Dashboard -> Prefs: Store Device Selection
+      end
+    end
+  }
+
+  // Main Dashboard Operations
+  group Dashboard Features {
+    Parent -> Dashboard: Select Navigation Item
+    
+    alt Stats Screen
+      Dashboard -> DB: Fetch Stats Data
+      DB -> Dashboard: Return Stats
+      Dashboard -> Parent: Display Charts & Stats
+      Note right of Dashboard: Screen Time, Apps Used, Alerts
+
+    else Recent Activity
+      Dashboard -> DB: Fetch Recent Data
+      DB -> Dashboard: Return Activity Data
+      Dashboard -> Parent: Display Activity List
+      Note right of Dashboard: Calls, Messages, Web History
+
+    else Remote Control
+      Parent -> Dashboard: Issue Command
+      Dashboard -> DB: Send Command
+      DB -> Dashboard: Command Status
+      Dashboard -> Parent: Show Result
+      Note right of Dashboard: Photos, Location, Audio
+
+    else Settings
+      Parent -> Dashboard: Change Settings
+      Dashboard -> DB: Update Preferences
+      DB -> Dashboard: Confirm Update
+      Dashboard -> Parent: Show Updated Settings
+    end
+  }
+
+  // Real-time Monitoring
+  group Monitoring {
+    DB --> FCM: New Activity Detected
+    FCM --> Dashboard: Push Notification
+    Dashboard --> Parent: Show Alert
+    
+    alt View Details
+      Parent -> Dashboard: Open Alert
+      Dashboard -> DB: Fetch Details
+      DB -> Dashboard: Activity Details
+      Dashboard -> Parent: Show Details Screen
+    end
+  }
+
+  // Social Media Monitoring
+  group Social Media {
+    Dashboard -> DB: Fetch Social Messages
+    DB -> Dashboard: WhatsApp/Instagram/Snapchat Data
+    Dashboard -> Parent: Display Messages
+    Note right of Dashboard: Filtered by Platform
+  }
+
+  // Device Management
+  group Device Management {
+    Parent -> Dashboard: Device Selection
+    Dashboard -> Prefs: Save Selected Device
+    Dashboard -> DB: Subscribe to Device Updates
+    DB --> Dashboard: Real-time Device Status
+  }
+
+  // Error Handling
+  group Error States {
+    alt Network Error
+      DB -->x Dashboard: Connection Failed
+      Dashboard -> Parent: Show Error State
+      Parent -> Dashboard: Retry Action
+    
+    alt No Device Selected
+      Dashboard -> Parent: Show Device Selection
+      Parent -> Dashboard: Select Device
+      Dashboard -> Prefs: Save Selection
+    end
+  }
+}

@@ -1,0 +1,113 @@
+digraph ActivityDiagram {
+    // Graph settings
+    rankdir=TB;
+    node [shape=rectangle, style=rounded, fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+    
+    // Start and initialization nodes
+    start [shape=circle, fillcolor=black, style=filled, width=0.2];
+    init [label="Initialize Firebase\nSetup Notifications"];
+    
+    // Authentication flow
+    auth [label="Authentication\n(AuthScreen)"];
+    auth_wrapper [label="Auth Wrapper\n(State Check)"];
+    
+    // Main navigation
+    dash [label="Dashboard\n(DashboardScreen)"];
+    device_select [label="Device Selection\n(SharedPreferences)"];
+    
+    // Main feature nodes
+    stats [label="Statistics\n(AdvancedStatsScreen)"];
+    recents [label="Recent Activity\n(RecentsScreen)"];
+    settings [label="Settings\n(SettingsScreen)"];
+    remote [label="Remote Commands\n(RemoteCommandsScreen)"];
+    
+    // Stats features
+    screen_time [label="Screen Time Analysis"];
+    app_usage [label="App Usage Stats"];
+    web_visits [label="Web Activity"];
+    comm_stats [label="Communication Stats"];
+    
+    // Recent activity features
+    calls [label="Call History\n(CallHistoryScreen)"];
+    messages [label="Messages\n(MessageScreen)"];
+    notifications [label="Alerts & Notifications"];
+    location_timeline [label="Location Timeline"];
+    
+    // Settings features
+    alert_prefs [label="Alert Preferences"];
+    monitoring_settings [label="Monitoring Settings"];
+    web_filters [label="Web Filters"];
+    app_limits [label="App Usage Limits"];
+    geofence [label="Geofence Settings"];
+    
+    // Remote features
+    instant_messaging [label="Instant Messaging\n(Monitoring)"];
+    remote_commands [label="Device Commands"];
+    
+    // Flow connections
+    start -> init;
+    init -> auth_wrapper;
+    auth_wrapper -> auth [label="not authenticated"];
+    auth_wrapper -> dash [label="authenticated"];
+    auth -> dash [label="success"];
+    auth -> auth [label="failure"];
+    
+    // Dashboard connections
+    dash -> device_select;
+    device_select -> {stats recents settings remote};
+    
+    // Stats connections
+    stats -> {screen_time app_usage web_visits comm_stats};
+    
+    // Recents connections
+    recents -> {calls messages notifications location_timeline};
+    
+    // Settings connections
+    settings -> {alert_prefs monitoring_settings web_filters app_limits geofence};
+    
+    // Remote connections
+    remote -> {instant_messaging remote_commands};
+    
+    // Bi-directional navigation
+    edge [dir=both];
+    {stats recents settings remote} -> dash;
+    
+    // Feature clusters
+    subgraph cluster_stats {
+        label="Statistics Module";
+        style=dashed;
+        color=blue;
+        screen_time; app_usage; web_visits; comm_stats;
+    }
+    
+    subgraph cluster_recents {
+        label="Recent Activity Module";
+        style=dashed;
+        color=green;
+        calls; messages; notifications; location_timeline;
+    }
+    
+    subgraph cluster_settings {
+        label="Settings Module";
+        style=dashed;
+        color=orange;
+        alert_prefs; monitoring_settings; web_filters; app_limits; geofence;
+    }
+    
+    subgraph cluster_remote {
+        label="Remote Control Module";
+        style=dashed;
+        color=red;
+        instant_messaging; remote_commands;
+    }
+    
+    // Graph styling
+    graph [
+        fontname="Arial",
+        fontsize=14,
+        label="Child Monitoring Application Activity Diagram",
+        labelloc=t,
+        style=rounded
+    ];
+}

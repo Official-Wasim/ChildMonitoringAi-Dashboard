@@ -145,7 +145,7 @@ Future<void> initializeFirebaseMessaging() async {
               channel.id,
               channel.name,
               channelDescription: channel.description,
-              icon: '@mipmap/ic_launcher', // Use app icon
+              icon: '@mipmap/ic_launcher', // app icon
               importance: Importance.max,
               priority: Priority.high,
               showWhen: true,

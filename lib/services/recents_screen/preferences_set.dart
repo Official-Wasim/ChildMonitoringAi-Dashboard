@@ -504,4 +504,79 @@ class PreferencesService {
       throw Exception('Failed to get app suggestions: $e');
     }
   }
+
+  // Fetch keyword alerts
+  static Future<List<String>> getKeywordAlerts(String deviceId) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('User not authenticated');
+
+      final snapshot = await FirebaseDatabase.instance
+          .ref()
+          .child('users/$uid/phones/$deviceId/preferences/keyword_alerts')
+          .get();
+
+      if (!snapshot.exists) return [];
+
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+      return data.keys.toList();
+    } catch (e) {
+      print('Error fetching keyword alerts: $e');
+      return [];
+    }
+  }
+
+  // Add a new keyword alert
+  static Future<void> addKeywordAlert({
+    required String deviceId,
+    required String keyword,
+  }) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('User not authenticated');
+
+      if (keyword.trim().isEmpty) {
+        throw Exception('Keyword cannot be empty');
+      }
+
+      // Create a sanitized key from the keyword
+      final keywordKey = keyword.toLowerCase().trim().replaceAll(' ', '_');
+
+      await FirebaseDatabase.instance
+          .ref()
+          .child('users/$uid/phones/$deviceId/preferences/keyword_alerts')
+          .child(keywordKey)
+          .set({
+        'keyword': keyword.trim(),
+        'created_at': ServerValue.timestamp,
+        'enabled': true,
+      });
+    } catch (e) {
+      print('Error adding keyword alert: $e');
+      throw Exception('Failed to add keyword alert: $e');
+    }
+  }
+
+  // Remove a keyword alert
+  static Future<void> removeKeywordAlert({
+    required String deviceId,
+    required String keyword,
+  }) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('User not authenticated');
+
+      // Create a sanitized key from the keyword
+      final keywordKey = keyword.toLowerCase().trim().replaceAll(' ', '_');
+
+      await FirebaseDatabase.instance
+          .ref()
+          .child('users/$uid/phones/$deviceId/preferences/keyword_alerts')
+          .child(keywordKey)
+          .remove();
+    } catch (e) {
+      print('Error removing keyword alert: $e');
+      throw Exception('Failed to remove keyword alert: $e');
+    }
+  }
 }

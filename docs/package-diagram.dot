@@ -1,0 +1,154 @@
+digraph ProjectStructure {
+    rankdir=TB;
+    node [shape=box, style=filled, fillcolor=lightgray];
+    
+    // Platform Packages
+    windows [label="windows"];
+    android [label="android"];
+    ios [label="ios"];
+    linux [label="linux"];
+    macos [label="macos"];
+    web [label="web"];
+    
+    // Core Package and Directories
+    lib [label="lib/"]
+    docs [label="documentation"]
+    screens_dir [label="lib/screens/"]
+    services_dir [label="lib/services/"]
+    models_dir [label="lib/models/"]
+    components_dir [label="lib/components/"]
+    theme_dir [label="lib/theme/"]
+
+    // Direct lib connections
+    lib -> screens_dir
+    lib -> services_dir
+    lib -> models_dir
+    lib -> components_dir
+    lib -> theme_dir
+
+    // Service Packages
+    subgraph cluster_services {
+        label="services"
+        style=dotted
+        
+        services_dir -> stats_service [label="stats_service.dart"]
+        services_dir -> auth_service [label="auth_service.dart"]
+        services_dir -> connectivity_service [label="connectivity_service.dart"]
+        services_dir -> geocoding_service [label="geocoding_service.dart"]
+        services_dir -> settings_service [label="settings_service.dart"]
+    }
+
+    // Theme Package
+    subgraph cluster_theme {
+        label="theme"
+        style=dotted
+        
+        theme_dir -> app_theme [label="theme.dart"]
+        theme_dir -> color_schemes [label="color_schemes.dart"]
+        theme_dir -> text_styles [label="text_styles.dart"]
+    }
+
+    // Model Packages
+    subgraph cluster_models {
+        label="models"
+        style=dotted
+        
+        models_dir -> contact_model [label="contact_info.dart"]
+        models_dir -> location_model [label="location_info.dart"]
+        models_dir -> chart_model [label="chart_data.dart"]
+        models_dir -> stats_model [label="stats_model.dart"]
+        models_dir -> message_model [label="message_model.dart"]
+        models_dir -> website_model [label="website_model.dart"]
+    }
+
+    // Screen Packages
+    subgraph cluster_screens {
+        label="screens"
+        style=dotted
+        
+        screens_dir -> auth_screen [label="auth_screen.dart"]
+        screens_dir -> dashboard_screen [label="dashboard_screen.dart"]
+        screens_dir -> stats_screen [label="stats_screen.dart"]
+        screens_dir -> settings_screen [label="settings_screen.dart"]
+        screens_dir -> recents_screen [label="recents_screen.dart"]
+        screens_dir -> remote_screen [label="remote_commands_screen.dart"]
+        screens_dir -> contacts_screen [label="contacts_screen.dart"]
+        screens_dir -> map_screen [label="map_screen.dart"]
+        screens_dir -> sites_screen [label="sites_screen.dart"]
+        screens_dir -> social_screen [label="snapchat_messages.dart"]
+    }
+
+    // Components Package
+    subgraph cluster_components {
+        label="components"
+        style=dotted
+        
+        components_dir -> stats_chart [label="charts/stats_chart.dart"]
+        components_dir -> stats_cards [label="cards/stats_cards.dart"]
+    }
+
+    // Dependencies between screens
+    auth_screen -> dashboard_screen
+    dashboard_screen -> stats_screen
+    dashboard_screen -> settings_screen
+    dashboard_screen -> recents_screen
+    dashboard_screen -> remote_screen
+    recents_screen -> contacts_screen
+    recents_screen -> map_screen
+    recents_screen -> sites_screen
+    recents_screen -> social_screen
+
+    // Model Dependencies
+    contacts_screen -> contact_model;
+    map_screen -> location_model;
+    stats_screen -> {chart_model stats_model};
+    social_screen -> message_model;
+    sites_screen -> website_model;
+    
+    // Service Dependencies
+    stats_screen -> stats_service;
+    auth_screen -> auth_service;
+    map_screen -> geocoding_service;
+    dashboard_screen -> connectivity_service;
+    settings_screen -> settings_service;
+    
+    // Theme Dependencies
+    {auth_screen dashboard_screen stats_screen settings_screen recents_screen remote_screen contacts_screen map_screen sites_screen social_screen} -> app_theme;
+    app_theme -> {color_schemes text_styles};
+    
+    // Service-Firebase Dependencies
+    {stats_service auth_service settings_service} -> firebase;
+    geocoding_service -> flutter_plugins;
+    connectivity_service -> flutter_plugins;
+
+    // Service Dependencies
+    contact_model -> firebase;
+    location_model -> firebase;
+    message_model -> firebase;
+    website_model -> firebase;
+    
+    // Plugin and External Dependencies
+    flutter_plugins [label="flutter\nplugins"];
+    firebase [label="firebase\nservices"];
+    
+    // Core Dependencies
+    lib -> {flutter_plugins firebase};
+    
+    // Platform Dependencies
+    {windows android ios linux macos web} -> lib;
+    
+    // Plugin Dependencies
+    flutter_plugins -> {
+        "connectivity_plus",
+        "firebase_auth",
+        "firebase_core",
+        "url_launcher"
+    };
+    
+    // Documentation
+    docs -> {
+        "component-diagram",
+        "package-diagram",
+        "collaboration-diagram"
+    };
+}

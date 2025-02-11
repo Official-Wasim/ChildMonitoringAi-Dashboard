@@ -219,6 +219,33 @@ class _SettingsScreenState extends State<SettingsScreen>
     });
   }
 
+  bool _isDeviceOnline(int? timestamp) {
+    if (timestamp == null) return false;
+    final lastUpdate = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final difference = DateTime.now().difference(lastUpdate);
+    return difference.inMinutes < 1;
+  }
+
+  Future<bool> _getDeviceOnlineStatus() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final refreshRef = FirebaseDatabase.instance.reference().child(
+            'users/${user.uid}/phones/${widget.selectedDevice}/on_refresh/refresh_result');
+
+        final event = await refreshRef.once();
+        if (event.snapshot.value != null) {
+          final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+          final timestamp = data['timestamp'] as int?;
+          return _isDeviceOnline(timestamp);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking online status: $e');
+    }
+    return false;
+  }
+
   Widget _buildSectionHeader(String title, String subtitle, IconData icon,
       bool isExpanded, VoidCallback onTap, AnimationController controller) {
     return Container(
@@ -482,39 +509,46 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
+                FutureBuilder<bool>(
+                  future: _getDeviceOnlineStatus(),
+                  builder: (context, snapshot) {
+                    final isOnline = snapshot.data ?? false;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Online',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.white,
-                        ),
+                      decoration: BoxDecoration(
+                        color: (isOnline ? Colors.green : Colors.red)
+                            .withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                    ],
-                  ),
-                )
-                    .animate(onPlay: (controller) => controller.repeat())
-                    .shimmer(duration: 1.seconds),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: isOnline ? Colors.green : Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isOnline ? 'Online' : 'Offline',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                        .animate(onPlay: (controller) => controller.repeat())
+                        .shimmer(duration: 1.seconds);
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 20),

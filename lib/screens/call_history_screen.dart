@@ -605,7 +605,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -614,7 +614,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
               Color(0xFFC5CAE9), // Indigo 100
               Color(0xFFE8EAF6), // Light Indigo 50
             ],
-            stops: const [0.0, 0.5, 1.0],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(

@@ -1,0 +1,106 @@
+digraph ProjectCollaboration {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+    
+    // Authentication & Core
+    subgraph cluster_auth {
+        label="Authentication";
+        style=dotted;
+        AuthScreen [label="AuthScreen\nUser Login"];
+        FirebaseAuth [label="Firebase\nAuthentication"];
+    }
+    
+    // Main Screens
+    subgraph cluster_screens {
+        label="Main Screens";
+        style=dotted;
+        DashboardScreen [label="Dashboard\nMain View"];
+        SettingsScreen [label="Settings\nConfiguration"];
+        StatsScreen [label="Stats\nAnalytics"];
+        
+        // Communication Screens
+        subgraph cluster_communication {
+            label="Communication Monitoring";
+            style=dotted;
+            CallHistoryScreen [label="Call History"];
+            SMSHistoryScreen [label="SMS History"];
+            MMSHistoryScreen [label="MMS History"];
+            InstantMessagingScreen [label="Instant Messaging"];
+        }
+        
+        // Activity Screens
+        subgraph cluster_activity {
+            label="Activity Monitoring";
+            style=dotted;
+            WebVisitScreen [label="Web History"];
+            MapScreen [label="Location Tracking"];
+            SocialAppScreen [label="Social Apps"];
+        }
+    }
+
+    // Services & Data
+    subgraph cluster_services {
+        label="Core Services";
+        style=dotted;
+        StatsService [label="StatsService\nData Management"];
+        DatabaseService [label="Firebase Database\nReal-time Data"];
+        SettingsController [label="Settings\nController"];
+    }
+
+    // Data Models
+    subgraph cluster_models {
+        label="Data Models";
+        style=dotted;
+        ChartData [label="ChartData"];
+        CallInfo [label="CallInfo"];
+        SMSInfo [label="SMSInfo"];
+        MMSInfo [label="MMSInfo"];
+        LocationInfo [label="LocationInfo"];
+        WebsiteStats [label="WebsiteStats"];
+    }
+
+    // UI Components
+    subgraph cluster_components {
+        label="UI Components";
+        style=dotted;
+        ScreenTimeChart [label="ScreenTimeChart"];
+        WebVisitsPieChart [label="WebVisitsPieChart"];
+        CallDistributionPieChart [label="CallDistributionChart"];
+        ChartColors [label="ChartColors"];
+    }
+
+    // External Dependencies
+    subgraph cluster_external {
+        label="External Dependencies";
+        style=dotted;
+        SyncfusionCharts [label="Syncfusion Charts"];
+        FirebaseRTDB [label="Firebase DB"];
+        FlutterMap [label="Flutter Map"];
+    }
+
+    // Authentication Flow
+    AuthScreen -> FirebaseAuth [label="authenticates"];
+    FirebaseAuth -> DashboardScreen [label="success"];
+
+    // Navigation Flow
+    DashboardScreen -> {CallHistoryScreen, SMSHistoryScreen, MMSHistoryScreen, WebVisitScreen, MapScreen, StatsScreen, SettingsScreen} [label="navigates"];
+
+    // Data Flow
+    DatabaseService -> {CallHistoryScreen, SMSHistoryScreen, MMSHistoryScreen, WebVisitScreen} [label="provides data"];
+    StatsService -> {ChartData, WebsiteStats} [label="processes"];
+    
+    // Model Usage
+    CallInfo -> CallHistoryScreen [label="displays"];
+    SMSInfo -> SMSHistoryScreen [label="displays"];
+    MMSInfo -> MMSHistoryScreen [label="displays"];
+    LocationInfo -> MapScreen [label="displays"];
+    
+    // Component Usage
+    SyncfusionCharts -> {ScreenTimeChart, WebVisitsPieChart, CallDistributionPieChart} [label="renders"];
+    ChartColors -> {ScreenTimeChart, WebVisitsPieChart, CallDistributionPieChart} [label="styles"];
+    FlutterMap -> MapScreen [label="renders"];
+    
+    // Settings & Control
+    SettingsController -> {CallHistoryScreen, SMSHistoryScreen, MMSHistoryScreen, WebVisitScreen, MapScreen} [label="configures"];
+    SettingsScreen -> SettingsController [label="manages"];
+}
