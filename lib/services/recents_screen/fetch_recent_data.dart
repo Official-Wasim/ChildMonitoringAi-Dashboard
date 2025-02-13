@@ -2,10 +2,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
-import '../../components/charts/stats_chart.dart';  
+import '../../components/charts/stats_chart.dart';
 
 class FetchDataService {
-  static Future<List<ScreenTimeData>> fetchScreenTimeData(String phoneModel) async {
+  static Future<List<ScreenTimeData>> fetchScreenTimeData(
+      String phoneModel) async {
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
 
@@ -17,31 +18,30 @@ class FetchDataService {
       for (int i = 6; i >= 0; i--) {
         final date = now.subtract(Duration(days: i));
         final dateStr = DateFormat('yyyy-MM-dd').format(date);
-        
+
         final DatabaseReference appUsageRef = FirebaseDatabase.instance
             .ref()
             .child('users/${user.uid}/phones/$phoneModel/app_usage/$dateStr');
 
         final DatabaseEvent event = await appUsageRef.once();
-        
+
         double totalHours = 0;
         if (event.snapshot.exists) {
           final data = event.snapshot.value as Map<dynamic, dynamic>;
           int totalMilliseconds = 0;
-          
+
           data.forEach((_, details) {
             if (details is Map && details.containsKey('usage_duration')) {
               totalMilliseconds += (details['usage_duration'] as int);
             }
           });
-          
+
           totalHours = totalMilliseconds / (1000 * 60 * 60); // Convert to hours
         }
 
         weekData.add(ScreenTimeData(
-          DateFormat('E').format(date), // Short day name (Mon, Tue, etc.)
-          double.parse(totalHours.toStringAsFixed(1))
-        ));
+            DateFormat('E').format(date), // Short day name (Mon, Tue, etc.)
+            double.parse(totalHours.toStringAsFixed(1))));
       }
 
       return weekData;
@@ -159,6 +159,37 @@ class FetchDataService {
       return timeline;
     } catch (e) {
       print('Error fetching geofence timeline: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchAppUsageData(
+      String deviceId, DateTime date) async {
+    try {
+      final snapshot = await FirebaseDatabase.instance
+          .ref()
+          .child(
+              'users/${FirebaseAuth.instance.currentUser?.uid}/phones/$deviceId/app_usage/${DateFormat('yyyy-MM-dd').format(date)}')
+          .get();
+
+      if (snapshot.exists) {
+        final data = Map<String, dynamic>.from(snapshot.value as Map);
+        return data.entries.map((entry) {
+          final appData = Map<String, dynamic>.from(entry.value as Map);
+          return {
+            'category': entry.key,
+            'minutes': appData['duration'] ?? 0.0,
+            'openCount': appData['open_count'] ?? 0,
+            'lastUsed': DateTime.fromMillisecondsSinceEpoch(
+                appData['last_used'] ?? DateTime.now().millisecondsSinceEpoch),
+            'firstUsed': DateTime.fromMillisecondsSinceEpoch(
+                appData['first_used'] ?? DateTime.now().millisecondsSinceEpoch),
+          };
+        }).toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching app usage data: $e');
       return [];
     }
   }

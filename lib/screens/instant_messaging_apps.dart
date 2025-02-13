@@ -19,6 +19,18 @@ class InstantMessagingAppsScreen extends StatefulWidget {
 
 class _InstantMessagingAppsScreenState
     extends State<InstantMessagingAppsScreen> {
+  // Add color scheme constants to match other screens
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
+
   late DatabaseReference _messagesRef;
   Map<String, int> messageCounts = {};
   bool isLoading = true;
@@ -237,19 +249,23 @@ class _InstantMessagingAppsScreenState
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight),
+        preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(24),
-              bottomRight: Radius.circular(24),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryColor, secondaryColor],
+            ),
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
                 blurRadius: 8,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -257,7 +273,7 @@ class _InstantMessagingAppsScreenState
             elevation: 0,
             backgroundColor: Colors.transparent,
             leading: IconButton(
-              icon: Icon(
+              icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: Colors.white,
                 size: 22,
@@ -276,30 +292,30 @@ class _InstantMessagingAppsScreenState
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              Color(0xFFE8EAF6), // Light Indigo 50
+              Color(0xFFC5CAE9), // Indigo 100
+              Color(0xFFE8EAF6), // Light Indigo 50
             ],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: isLoading
-            ? Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: SingleChildScrollView(
-                    physics:
-                        BouncingScrollPhysics(), // Added for smooth scrolling
+                    physics: const BouncingScrollPhysics(),
                     child: StaggeredGrid.count(
                       crossAxisCount: 4,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
                       children: apps.map((app) {
-                        // Update message count from Firebase data
                         final count = messageCounts[app.name] ?? 0;
                         return StaggeredGridTile.fit(
                           crossAxisCellCount: 2,
@@ -339,13 +355,12 @@ class _InstantMessagingAppsScreenState
                                   _showComingSoonDialog(context, app);
                               }
                             },
-                            child: AnimatedContainer(
-                              duration: Duration(milliseconds: 300),
+                            child: Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
+                                    app.color.withOpacity(0.9),
                                     app.color.withOpacity(0.7),
-                                    app.color.withOpacity(0.3),
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
@@ -353,27 +368,38 @@ class _InstantMessagingAppsScreenState
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: app.color.withOpacity(0.5),
-                                    blurRadius: 15,
-                                    offset: Offset(0, 8),
+                                    color: app.color.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
                                   ),
                                 ],
                               ),
                               padding: const EdgeInsets.all(16),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment
-                                    .center, // Center align all items
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Stack(
-                                    clipBehavior:
-                                        Clip.none, // Allow badge to overflow
+                                    clipBehavior: Clip.none,
                                     children: [
-                                      CircleAvatar(
-                                        radius: 30,
-                                        backgroundColor: Colors.white,
-                                        child: Icon(app.icon,
-                                            color: app.color, size: 32),
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.9),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: app.color.withOpacity(0.3),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          app.icon,
+                                          color: app.color,
+                                          size: 32,
+                                        ),
                                       ),
                                       if (count > 0)
                                         Positioned(
@@ -401,7 +427,7 @@ class _InstantMessagingAppsScreenState
                                               count > 99
                                                   ? "99+"
                                                   : count.toString(),
-                                              style: TextStyle(
+                                              style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.bold,
@@ -411,23 +437,24 @@ class _InstantMessagingAppsScreenState
                                         ),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 16),
                                   Text(
                                     app.name,
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors
-                                          .white, // Changed from Colors.black87 to Colors.white
+                                      color: Colors.white,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 4),
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.9),
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       count > 0
@@ -435,7 +462,7 @@ class _InstantMessagingAppsScreenState
                                           : "No messages",
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: app.color.withOpacity(0.8),
+                                        color: app.color,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),

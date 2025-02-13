@@ -33,6 +33,18 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
   final RefreshController _refreshController =
       RefreshController(initialRefresh: false); // Add this line
 
+  // Add color scheme constants to match apps screen
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
+
   @override
   void initState() {
     super.initState();
@@ -214,7 +226,6 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
         throw 'Could not launch $urlString';
       }
     } catch (e) {
-      print('Error launching URL: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -239,7 +250,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           contentPadding:
-              EdgeInsets.only(left: 24, right: 24, bottom: 24, top: 16),
+              const EdgeInsets.only(left: 24, right: 24, bottom: 24, top: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -257,7 +268,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                 icon: Icon(Icons.close, color: Colors.grey.shade600),
                 onPressed: () => Navigator.of(context).pop(),
                 padding: EdgeInsets.zero,
-                constraints: BoxConstraints(),
+                constraints: const BoxConstraints(),
                 splashRadius: 24,
               ),
             ],
@@ -274,7 +285,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                     height: 1.5,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   '${visit['packageName'] ?? 'Unknown App'}',
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -285,7 +296,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
               ],
             ),
           ),
-          actionsPadding: EdgeInsets.fromLTRB(24, 0, 24, 16),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
           actions: [
             Row(
               children: [
@@ -295,7 +306,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                       Clipboard.setData(
                           ClipboardData(text: visit['url'] ?? ''));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('URL copied to clipboard'),
                           backgroundColor: Colors.green,
                           duration: Duration(seconds: 1),
@@ -303,25 +314,25 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                         ),
                       );
                     },
-                    icon: Icon(Icons.copy, size: 18),
-                    label: Text('Copy URL'),
+                    icon: const Icon(Icons.copy, size: 18),
+                    label: const Text('Copy URL'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.blue.shade700,
                       side: BorderSide(color: Colors.blue.shade700),
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).pop();
                       _launchURL(visit['url'] ?? '');
                     },
-                    icon: Icon(Icons.open_in_new, size: 18),
-                    label: Text('Open Link'),
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: const Text('Open Link'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
                       elevation: 0,
                     ),
@@ -365,7 +376,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
     final theme = Theme.of(context);
 
     return ListView.builder(
-      physics: BouncingScrollPhysics(), // Add bouncy physics
+      physics: const BouncingScrollPhysics(), // Add bouncy physics
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: groupedVisits.length + (_hasMoreData ? 1 : 0),
       itemBuilder: (context, index) {
@@ -376,13 +387,14 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
               child: TextButton(
                 onPressed: _loadMoreData,
                 style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   backgroundColor: Colors.blue.withOpacity(0.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
+                child: const Text(
                   'Load More',
                   style: TextStyle(
                     color: Colors.blue,
@@ -400,28 +412,29 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
         return StickyHeader(
           header: Container(
             color: Colors.transparent, // Set background to fully transparent
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.blue, // Change to Colors.blue
+                    color: primaryColor,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     dateStr,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   '${visitsForDate.length} visits',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
+                  style: const TextStyle(
+                    color: primaryColor,
                     fontSize: 13,
                   ),
                 ),
@@ -453,7 +466,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                           children: [
                             Icon(Icons.link,
                                 color: Colors.blue.shade700, size: 24),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,7 +479,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                                       height: 1.5,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
                                     packageName,
                                     style: theme.textTheme.bodySmall?.copyWith(
@@ -478,7 +491,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                             ),
                           ],
                         ),
-                        Divider(height: 16),
+                        const Divider(height: 16),
                         if (visit['title'] != null) ...[
                           Text(
                             visit['title'],
@@ -489,16 +502,16 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                               height: 1.4,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                         ],
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.access_time,
+                                const Icon(Icons.access_time,
                                     size: 16, color: Colors.grey),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text(
                                   formattedTime,
                                   style: TextStyle(
@@ -510,8 +523,9 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                             ),
                             Row(
                               children: [
-                                Icon(Icons.timer, size: 16, color: Colors.grey),
-                                SizedBox(width: 4),
+                                const Icon(Icons.timer,
+                                    size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
                                 Text(
                                   duration,
                                   style: TextStyle(
@@ -547,11 +561,16 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
+        preferredSize:
+            const Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.only(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryColor, secondaryColor],
+            ),
+            borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(40),
               bottomRight: Radius.circular(40),
             ),
@@ -559,7 +578,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
                 blurRadius: 8,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -567,7 +586,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
             elevation: 0,
             backgroundColor: Colors.transparent,
             leading: IconButton(
-              icon: Icon(
+              icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: Colors.white,
                 size: 22,
@@ -583,7 +602,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(80), // Changed from 100
+              preferredSize: const Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
@@ -602,7 +621,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                             BoxShadow(
                               color: Colors.black.withOpacity(0.1),
                               blurRadius: 4,
-                              offset: Offset(0, 2),
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
@@ -614,9 +633,10 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
-                            prefixIcon: Icon(Icons.search, color: Colors.blue),
+                            prefixIcon:
+                                const Icon(Icons.search, color: Colors.blue),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
+                            contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                           ),
                         ),
@@ -631,14 +651,16 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
       ),
       body: Container(
         // Remove the top padding that was creating extra space
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              Color(0xFFE8EAF6), // Light Indigo 50
+              Color(0xFFC5CAE9), // Indigo 100
+              Color(0xFFE8EAF6), // Light Indigo 50
             ],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
@@ -647,7 +669,7 @@ class _WebVisitHistoryPageState extends State<WebVisitHistoryPage> {
               // Remove the SizedBox that was adding extra space
               Expanded(
                 child: _isLoading
-                    ? Center(child: CircularProgressIndicator())
+                    ? const Center(child: CircularProgressIndicator())
                     : _filteredWebVisitHistory.isEmpty
                         ? Center(
                             child: Text(

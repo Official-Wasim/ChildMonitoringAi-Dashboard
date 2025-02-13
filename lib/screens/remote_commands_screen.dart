@@ -1105,269 +1105,283 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppTheme.primaryColor,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-            size: 22,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          "Remote Control",
-          style: AppTheme.headlineStyle,
-        ),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(30),
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60), // Adjusted height
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: 16,
-              right: 16,
-              bottom: 12,
-              top: 12,
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        );
+        return false;
+      },
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: AppTheme.primaryColor,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 22,
             ),
-            child: _buildDeviceSelector(), // Always show the device selector
+            onPressed: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => DashboardScreen()),
+            ),
+          ),
+          title: Text(
+            "Remote Control",
+            style: AppTheme.headlineStyle,
+          ),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(30),
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(60), // Adjusted height
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: 12,
+                top: 12,
+              ),
+              child: _buildDeviceSelector(), // Always show the device selector
+            ),
           ),
         ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppTheme.primaryColor,
-              AppTheme.primaryColor.withOpacity(0.1),
-              AppTheme.primaryColor.withOpacity(0.3),
-            ],
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withOpacity(0.1),
+                AppTheme.primaryColor.withOpacity(0.3),
+              ],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 20), // Reduced top padding
-              // New Modern Tab Bar with updated styling
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor
-                      .withOpacity(0.9), // Changed from white
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    dividerColor: Colors.transparent,
-                    labelColor: AppTheme.primaryColor,
-                    unselectedLabelColor: Colors.grey[600],
-                    labelStyle: _titleStyle.copyWith(fontSize: 16),
-                    unselectedLabelStyle: _titleStyle.copyWith(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                    tabs: [
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.touch_app),
-                            SizedBox(width: 8),
-                            Text('Actions'),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.history),
-                            SizedBox(width: 8),
-                            Text('Results'),
-                          ],
-                        ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 20), // Reduced top padding
+                // New Modern Tab Bar with updated styling
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor
+                        .withOpacity(0.9), // Changed from white
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 8), // Reduced gap
-              // Tab View Content
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Actions Tab
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          _buildFeatureCard(
-                            title: 'Location Tracking',
-                            subtitle: 'Get current device location',
-                            icon: Icons.location_on,
-                            iconColor: Colors.red,
-                            child: _buildModernButton(
-                              onPressed: () => _sendCommand('get_location', {}),
-                              label: 'Get Location',
-                              icon: Icons.my_location,
-                            ),
-                          ),
-                          _buildFeatureCard(
-                            title: 'Camera Control',
-                            subtitle: 'Take photos using device camera',
-                            icon: Icons.camera_alt,
-                            iconColor: Colors.green,
-                            child: _buildTakePictureSection(),
-                          ),
-                          _buildFeatureCard(
-                            title: 'Record Audio',
-                            subtitle: 'Record audio using device microphone',
-                            icon: Icons.mic,
-                            iconColor: Colors.purple,
-                            child: _buildRecordAudioSection(),
-                          ),
-                          _buildFeatureCard(
-                            title: 'Take Screenshot',
-                            subtitle: 'Capture a screenshot of the device',
-                            icon: Icons.screenshot,
-                            iconColor: Colors.brown,
-                            child: _buildScreenshotSection(),
-                          ),
-                          _buildFeatureCard(
-                            title: 'Recover Data',
-                            subtitle: 'Recover SMS and call logs',
-                            icon: Icons.storage,
-                            iconColor: Colors.orange,
-                            child: _buildRecoverDataSection(),
-                          ),
-                          _buildFeatureCard(
-                            title: 'Retrieve Contacts',
-                            subtitle: 'Retrieve list of contacts',
-                            icon: Icons.contacts,
-                            iconColor: Colors.blue,
-                            child: _buildRetrieveContactsSection(),
-                          ),
-                          _buildFeatureCard(
-                            title: 'Send SMS',
-                            subtitle: 'Send SMS to a phone number',
-                            icon: Icons.message,
-                            iconColor: Colors.teal,
-                            child: _buildSendSmsSection(),
-                          ),
-                          _buildFeatureCard(
-                            title: 'Vibrate the Phone',
-                            subtitle:
-                                'Vibrate the phone for a specified duration',
-                            icon: Icons.vibration,
-                            iconColor: Colors.pink,
-                            child: _buildVibrateSection(),
-                          ),
-                        ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
                       ),
+                      dividerColor: Colors.transparent,
+                      labelColor: AppTheme.primaryColor,
+                      unselectedLabelColor: Colors.grey[600],
+                      labelStyle: _titleStyle.copyWith(fontSize: 16),
+                      unselectedLabelStyle: _titleStyle.copyWith(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      tabs: [
+                        Tab(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.touch_app),
+                              SizedBox(width: 8),
+                              Text('Actions'),
+                            ],
+                          ),
+                        ),
+                        Tab(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.history),
+                              SizedBox(width: 8),
+                              Text('Results'),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    // Results Tab
-                    _buildResultsTab(),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8), // Reduced gap
+                // Tab View Content
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Actions Tab
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            _buildFeatureCard(
+                              title: 'Location Tracking',
+                              subtitle: 'Get current device location',
+                              icon: Icons.location_on,
+                              iconColor: Colors.red,
+                              child: _buildModernButton(
+                                onPressed: () =>
+                                    _sendCommand('get_location', {}),
+                                label: 'Get Location',
+                                icon: Icons.my_location,
+                              ),
+                            ),
+                            _buildFeatureCard(
+                              title: 'Camera Control',
+                              subtitle: 'Take photos using device camera',
+                              icon: Icons.camera_alt,
+                              iconColor: Colors.green,
+                              child: _buildTakePictureSection(),
+                            ),
+                            _buildFeatureCard(
+                              title: 'Record Audio',
+                              subtitle: 'Record audio using device microphone',
+                              icon: Icons.mic,
+                              iconColor: Colors.purple,
+                              child: _buildRecordAudioSection(),
+                            ),
+                            _buildFeatureCard(
+                              title: 'Take Screenshot',
+                              subtitle: 'Capture a screenshot of the device',
+                              icon: Icons.screenshot,
+                              iconColor: Colors.brown,
+                              child: _buildScreenshotSection(),
+                            ),
+                            _buildFeatureCard(
+                              title: 'Recover Data',
+                              subtitle: 'Recover SMS and call logs',
+                              icon: Icons.storage,
+                              iconColor: Colors.orange,
+                              child: _buildRecoverDataSection(),
+                            ),
+                            _buildFeatureCard(
+                              title: 'Retrieve Contacts',
+                              subtitle: 'Retrieve list of contacts',
+                              icon: Icons.contacts,
+                              iconColor: Colors.blue,
+                              child: _buildRetrieveContactsSection(),
+                            ),
+                            _buildFeatureCard(
+                              title: 'Send SMS',
+                              subtitle: 'Send SMS to a phone number',
+                              icon: Icons.message,
+                              iconColor: Colors.teal,
+                              child: _buildSendSmsSection(),
+                            ),
+                            _buildFeatureCard(
+                              title: 'Vibrate the Phone',
+                              subtitle:
+                                  'Vibrate the phone for a specified duration',
+                              icon: Icons.vibration,
+                              iconColor: Colors.pink,
+                              child: _buildVibrateSection(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Results Tab
+                      _buildResultsTab(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      bottomNavigationBar: CurvedNavigationBar(
-        key: _bottomNavigationKey,
-        index: _page,
-        items: [
-          CurvedNavigationBarItem(
-            child: Icon(Icons.home_outlined),
-            label: 'Home',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.history),
-            label: 'Recent',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.phone_android_outlined),
-            label: 'Remote',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.bar_chart),
-            label: 'Stats',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-        color: AppTheme.surfaceColor,
-        buttonBackgroundColor: AppTheme.surfaceColor,
-        backgroundColor: AppTheme.primaryColor,
-        animationCurve: Curves.easeInOutCubic,
-        animationDuration: const Duration(milliseconds: 800),
-        onTap: (index) {
-          Navigator.push(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) {
-                switch (index) {
-                  case 0:
-                    return DashboardScreen();
-                  case 1:
-                    return RecentsScreen(selectedDevice: widget.selectedDevice);
-                  case 2:
-                    return RemoteControlScreen(
-                        selectedDevice: widget.selectedDevice);
-                  case 3:
-                    return AdvancedStatsScreen(
-                        selectedDevice: widget.selectedDevice);
-                  case 4:
-                    return SettingsScreen(
-                        selectedDevice: widget.selectedDevice);
-                  default:
-                    return DashboardScreen();
-                }
-              },
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                const begin = Offset(1.0, 0.0);
-                const end = Offset.zero;
-                const curve = Curves.easeInOutCubic;
-
-                var tween = Tween(begin: begin, end: end)
-                    .chain(CurveTween(curve: curve));
-
-                return SlideTransition(
-                  position: animation.drive(tween),
-                  child: child,
-                );
-              },
+        bottomNavigationBar: CurvedNavigationBar(
+          key: _bottomNavigationKey,
+          index: _page,
+          items: [
+            CurvedNavigationBarItem(
+              child: Icon(Icons.home_outlined),
+              label: 'Home',
             ),
-          );
-        },
-        letIndexChange: (index) => true,
+            CurvedNavigationBarItem(
+              child: Icon(Icons.history),
+              label: 'Recent',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.phone_android_outlined),
+              label: 'Remote',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.bar_chart),
+              label: 'Stats',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.settings),
+              label: 'Settings',
+            ),
+          ],
+          color: AppTheme.surfaceColor,
+          buttonBackgroundColor: AppTheme.surfaceColor,
+          backgroundColor: AppTheme.primaryColor,
+          animationCurve: Curves.easeInOutCubic,
+          animationDuration: const Duration(milliseconds: 800),
+          onTap: (index) {
+            Navigator.push(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  switch (index) {
+                    case 0:
+                      return DashboardScreen();
+                    case 1:
+                      return RecentsScreen(
+                          selectedDevice: widget.selectedDevice);
+                    case 2:
+                      return RemoteControlScreen(
+                          selectedDevice: widget.selectedDevice);
+                    case 3:
+                      return AdvancedStatsScreen(
+                          selectedDevice: widget.selectedDevice);
+                    case 4:
+                      return SettingsScreen(
+                          selectedDevice: widget.selectedDevice);
+                    default:
+                      return DashboardScreen();
+                  }
+                },
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(1.0, 0.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeInOutCubic;
+
+                  var tween = Tween(begin: begin, end: end)
+                      .chain(CurveTween(curve: curve));
+
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
+              ),
+            );
+          },
+          letIndexChange: (index) => true,
+        ),
       ),
     );
   }

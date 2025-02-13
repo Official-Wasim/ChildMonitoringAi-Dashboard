@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
-import 'package:intl/intl.dart';
 import 'dashboard_screen.dart';
 import 'recents_screen.dart';
 import 'settings_screeen.dart';
@@ -13,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../components/charts/stats_chart.dart';
 import '../components/charts/stats_cards.dart';
 import '../theme/theme.dart';
-import '../services/stats_screen/fetch_stats_data.dart'; // Add this import
+import '../services/stats_screen/fetch_stats_data.dart'; 
 
 class AdvancedStatsScreen extends StatefulWidget {
   final String selectedDevice;
@@ -60,22 +58,19 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
 
   List<Map<String, dynamic>> _callDetails = [];
 
-  // Add this variable
   int _totalMessagesCount = 0;
   double _messageTrend = 0;
   double _callTrend = 0;
 
-  // Add this variable to store web visits data
   List<ChartData> _webVisitsData = [];
 
   final UserStatsService _statsService = UserStatsService();
 
-  // Replace the hardcoded _screenTimeData with:
   List<ScreenTimeData> _screenTimeData = [];
 
   // Update these variables
   Map<String, dynamic> _messageStats = {
-    'today': 0,
+    'today': 0, 
     'yesterday': 0,
     'trend': 0.0,
   };
@@ -362,16 +357,13 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isTablet = screenSize.width > 600;
-
     return WillPopScope(
       onWillPop: () async {
-        if (_page != 0) {
-          setState(() => _page = 0);
-          return false;
-        }
-        return true;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        );
+        return false;
       },
       child: Scaffold(
         extendBodyBehindAppBar: false, // Changed to false
@@ -379,20 +371,23 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
           elevation: 0,
           backgroundColor: AppTheme.primaryColor,
           leading: IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.arrow_back_ios_new_rounded,
               color: AppTheme.surfaceColor,
               size: 22,
             ),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => DashboardScreen()),
+            ),
           ),
-          title: Text(
-            "Statistics", // Changed from "Statistics" with potential hidden characters
+          title: const Text(
+            "Statistics",
             style: AppTheme.headlineStyle,
           ),
           shape: AppTheme.appBarTheme.shape,
           bottom: PreferredSize(
-            preferredSize: Size.fromHeight(60), // Adjusted height
+            preferredSize: const Size.fromHeight(60), // Adjusted height
             child: Padding(
               padding: const EdgeInsets.only(
                 left: 16,
@@ -407,7 +402,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
         body: _isLoading
             ? _buildLoadingIndicator()
             : Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: AppTheme.backgroundGradient,
                 ),
                 child: SafeArea(
@@ -584,7 +579,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
 
   Widget _buildLoadingIndicator() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: AppTheme.backgroundGradient,
       ),
       child: Center(
@@ -614,7 +609,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     final padding = constraints.maxWidth * 0.04;
 
     if (_isLoading) {
-      return Center(
+      return const Center(
         child: CircularProgressIndicator(
           valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
         ),
@@ -657,7 +652,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     final padding = constraints.maxWidth * 0.04;
 
     if (_isLoading) {
-      return Center(
+      return const Center(
         child: CircularProgressIndicator(
           valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
         ),
@@ -690,7 +685,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
     final appOpensCount = (overview?['appOpens'] ?? 0) as int;
 
     if (_isLoading) {
-      return Center(
+      return const Center(
         child: CircularProgressIndicator(
           valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
         ),
@@ -721,7 +716,7 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
             blurRadius: 4,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -736,8 +731,8 @@ class _AdvancedStatsScreenState extends State<AdvancedStatsScreen>
               style: TextStyle(color: Colors.grey.shade600),
             ),
           ),
-          icon: Padding(
-            padding: const EdgeInsets.only(right: 16),
+          icon: const Padding(
+            padding: EdgeInsets.only(right: 16),
             child: Icon(Icons.phone_android, color: Colors.blue),
           ),
           style: Theme.of(context).textTheme.bodyMedium,

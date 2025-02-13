@@ -43,4 +43,31 @@ class GeocodingService {
       return 'Location unavailable';
     }
   }
+
+  static Future<List<Map<String, dynamic>>> searchLocation(String query) async {
+    await _waitForNextRequest();
+
+    final response = await http.get(
+      Uri.parse(
+        'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}',
+      ),
+      headers: {
+        'User-Agent': 'YourAppName/1.0',
+        'Accept-Language': 'en-US',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data
+          .map((item) => {
+                'name': item['display_name'].toString().split(',').first,
+                'address': item['display_name'],
+                'lat': double.parse(item['lat']),
+                'lon': double.parse(item['lon']),
+              })
+          .toList();
+    }
+    throw Exception('Failed to search location: ${response.statusCode}');
+  }
 }

@@ -6,7 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar.dart';
 import 'package:curved_labeled_navigation_bar/curved_navigation_bar_item.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test/screens/geofence_picker_screen.dart';
 import 'dart:async';
 import '../services/recents_screen/fetch_recent_data.dart';
 import '../services/stats_screen/fetch_stats_data.dart'; // Add this import
@@ -251,11 +253,11 @@ class _RecentsScreenState extends State<RecentsScreen>
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        if (_page != 0) {
-          setState(() => _page = 0);
-          return false;
-        }
-        return true;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        );
+        return false;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FF),
@@ -273,24 +275,27 @@ class _RecentsScreenState extends State<RecentsScreen>
       elevation: 0,
       backgroundColor: AppTheme.primaryColor,
       leading: IconButton(
-        icon: Icon(
+        icon: const Icon(
           Icons.arrow_back_ios_new_rounded,
           color: AppTheme.surfaceColor,
           size: 22,
         ),
-        onPressed: () => Navigator.of(context).pop(),
+        onPressed: () => Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        ),
       ),
-      title: Text("Recent Activity", style: AppTheme.headlineStyle),
+      title: const Text("Recent Activity", style: AppTheme.headlineStyle),
       actions: [
         IconButton(
-          icon: Icon(
+          icon: const Icon(
             Icons.calendar_today_rounded,
             color: AppTheme.surfaceColor,
           ),
           onPressed: () => _showDatePicker(),
         ),
         IconButton(
-          icon: Icon(
+          icon: const Icon(
             Icons.notifications_active_outlined,
             color: AppTheme.surfaceColor,
           ),
@@ -1063,7 +1068,7 @@ class _RecentsScreenState extends State<RecentsScreen>
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
+            colorScheme: const ColorScheme.light(
               primary: AppTheme.primaryColor,
             ),
           ),
@@ -1108,9 +1113,9 @@ class _RecentsScreenState extends State<RecentsScreen>
               children: [
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppTheme.primaryColor,
-                    borderRadius: const BorderRadius.only(
+                    borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(20),
                       topRight: Radius.circular(20),
                     ),
@@ -1411,7 +1416,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close),
+                          icon: const Icon(Icons.close),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -1451,7 +1456,8 @@ class _RecentsScreenState extends State<RecentsScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                         suffixIcon: IconButton(
-                          icon: Icon(Icons.add, color: AppTheme.primaryColor),
+                          icon: const Icon(Icons.add,
+                              color: AppTheme.primaryColor),
                           onPressed: () async {
                             final keyword = _keywordController.text.trim();
                             if (keyword.isEmpty) {
@@ -1509,7 +1515,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
-                                    leading: Icon(Icons.key,
+                                    leading: const Icon(Icons.key,
                                         color: AppTheme.primaryColor),
                                     title: Text(keywords[index]),
                                     trailing: IconButton(
@@ -1586,7 +1592,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.close),
+                        icon: const Icon(Icons.close),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
@@ -1603,7 +1609,8 @@ class _RecentsScreenState extends State<RecentsScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       suffixIcon: IconButton(
-                        icon: Icon(Icons.add, color: AppTheme.primaryColor),
+                        icon:
+                            const Icon(Icons.add, color: AppTheme.primaryColor),
                         onPressed: () async {
                           if (_keywordController.text.isNotEmpty) {
                             await PreferencesService.addWebAlert(
@@ -1631,7 +1638,8 @@ class _RecentsScreenState extends State<RecentsScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       suffixIcon: IconButton(
-                        icon: Icon(Icons.add, color: AppTheme.primaryColor),
+                        icon:
+                            const Icon(Icons.add, color: AppTheme.primaryColor),
                         onPressed: () async {
                           if (_urlController.text.isNotEmpty) {
                             await PreferencesService.addWebAlert(
@@ -1723,7 +1731,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                     style: GoogleFonts.poppins(),
                   ),
                   trailing: IconButton(
-                    icon: Icon(Icons.delete_outline, color: Colors.red),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: () async {
                       await PreferencesService.removeWebAlert(
                         deviceId: _selectedDevice,
@@ -1787,7 +1795,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close),
+                          icon: const Icon(Icons.close),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -1857,7 +1865,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    prefixIcon: Icon(Icons.apps),
+                                    prefixIcon: const Icon(Icons.apps),
                                   ),
                                 ),
                                 if (_suggestions.isNotEmpty)
@@ -1871,7 +1879,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                                       border:
                                           Border.all(color: Colors.grey[300]!),
                                     ),
-                                    constraints: BoxConstraints(
+                                    constraints: const BoxConstraints(
                                       maxHeight: 200,
                                     ),
                                     child: ListView.builder(
@@ -1909,7 +1917,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                prefixIcon: Icon(Icons.code),
+                                prefixIcon: const Icon(Icons.code),
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -1949,7 +1957,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                                                 (index) => Center(
                                                   child: Text(
                                                     '$index',
-                                                    style: TextStyle(
+                                                    style: const TextStyle(
                                                       fontSize: 20,
                                                       color:
                                                           AppTheme.primaryColor,
@@ -1987,7 +1995,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                                                 (index) => Center(
                                                   child: Text(
                                                     '$index',
-                                                    style: TextStyle(
+                                                    style: const TextStyle(
                                                       fontSize: 20,
                                                       color:
                                                           AppTheme.primaryColor,
@@ -2031,7 +2039,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                           ),
-                                          child: Icon(
+                                          child: const Icon(
                                             Icons.timer,
                                             color: AppTheme.primaryColor,
                                           ),
@@ -2137,7 +2145,7 @@ class _RecentsScreenState extends State<RecentsScreen>
         content: Text(message),
         backgroundColor: isError ? Colors.red : Colors.green,
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(8),
+        margin: const EdgeInsets.all(8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
@@ -2188,7 +2196,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close),
+                          icon: const Icon(Icons.close),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -2226,7 +2234,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                               decoration: InputDecoration(
                                 labelText: 'Fence Name',
                                 hintText: 'Enter Fence name',
-                                prefixIcon: Icon(Icons.location_on),
+                                prefixIcon: const Icon(Icons.location_on),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -2241,13 +2249,13 @@ class _RecentsScreenState extends State<RecentsScreen>
                                     decoration: InputDecoration(
                                       labelText: 'Latitude',
                                       hintText: '00.0000',
-                                      prefixIcon: Icon(Icons.explore),
+                                      prefixIcon: const Icon(Icons.explore),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
                                     keyboardType:
-                                        TextInputType.numberWithOptions(
+                                        const TextInputType.numberWithOptions(
                                             decimal: true),
                                   ),
                                 ),
@@ -2258,13 +2266,14 @@ class _RecentsScreenState extends State<RecentsScreen>
                                     decoration: InputDecoration(
                                       labelText: 'Longitude',
                                       hintText: '00.0000',
-                                      prefixIcon: Icon(Icons.explore_outlined),
+                                      prefixIcon:
+                                          const Icon(Icons.explore_outlined),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
                                     keyboardType:
-                                        TextInputType.numberWithOptions(
+                                        const TextInputType.numberWithOptions(
                                             decimal: true),
                                   ),
                                 ),
@@ -2279,35 +2288,70 @@ class _RecentsScreenState extends State<RecentsScreen>
                                     decoration: InputDecoration(
                                       labelText: 'Radius (meters)',
                                       hintText: 'Enter radius',
-                                      prefixIcon:
-                                          Icon(Icons.radio_button_checked),
+                                      prefixIcon: const Icon(
+                                          Icons.radio_button_checked),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      contentPadding: EdgeInsets.symmetric(
-                                          vertical: 20,
-                                          horizontal: 12), // Adjust padding
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 20,
+                                              horizontal: 12), // Adjust padding
                                     ),
                                     keyboardType: TextInputType.number,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 ElevatedButton.icon(
-                                  icon: Icon(Icons.map, color: Colors.white),
-                                  label: Text('Pick on Map',
+                                  icon: const Icon(Icons.map,
+                                      color: Colors.white),
+                                  label: const Text('Pick on Map',
                                       style: TextStyle(color: Colors.white)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.primaryColor,
-                                    padding: EdgeInsets.symmetric(
+                                    padding: const EdgeInsets.symmetric(
                                         horizontal: 16, vertical: 12),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  onPressed: () {
-                                    // TODO: Implement map picker
-                                    showMessage(
-                                        'Map picker will be implemented soon');
+                                  onPressed: () async {
+                                    final result =
+                                        await Navigator.push<GeofenceLocation>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            GeofencePickerScreen(
+                                          initialLocation: _latController
+                                                      .text.isNotEmpty &&
+                                                  _lngController.text.isNotEmpty
+                                              ? LatLng(
+                                                  double.parse(
+                                                      _latController.text),
+                                                  double.parse(
+                                                      _lngController.text),
+                                                )
+                                              : null,
+                                          initialRadius:
+                                              _radiusController.text.isNotEmpty
+                                                  ? double.parse(
+                                                      _radiusController.text)
+                                                  : 100,
+                                        ),
+                                      ),
+                                    );
+
+                                    if (result != null) {
+                                      setState(() {
+                                        _nameController.text = result.name;
+                                        _latController.text =
+                                            result.latitude.toString();
+                                        _lngController.text =
+                                            result.longitude.toString();
+                                        _radiusController.text =
+                                            result.radius.toString();
+                                      });
+                                    }
                                   },
                                 ),
                               ],
@@ -2340,20 +2384,20 @@ class _RecentsScreenState extends State<RecentsScreen>
                               )
                             else
                               ...geofences.map((fence) => Card(
-                                    margin: EdgeInsets.only(bottom: 8),
+                                    margin: const EdgeInsets.only(bottom: 8),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: ListTile(
                                       leading: Container(
-                                        padding: EdgeInsets.all(8),
+                                        padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
                                           color: AppTheme.primaryColor
                                               .withOpacity(0.1),
                                           borderRadius:
                                               BorderRadius.circular(8),
                                         ),
-                                        child: Icon(Icons.location_on,
+                                        child: const Icon(Icons.location_on,
                                             color: AppTheme.primaryColor),
                                       ),
                                       title: Text(
@@ -2396,7 +2440,7 @@ class _RecentsScreenState extends State<RecentsScreen>
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryColor,
-                          padding: EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -2518,10 +2562,10 @@ class _RecentsScreenState extends State<RecentsScreen>
           'Location History',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Location history will be displayed here...'),
+            Text('Location history will be displayed here...'),
             // Add map or location history UI here
           ],
         ),
@@ -2577,11 +2621,11 @@ class _RecentsScreenState extends State<RecentsScreen>
           'App Opens Details',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Details about app opens and launch frequency...'),
+            Text('Details about app opens and launch frequency...'),
           ],
         ),
         actions: [

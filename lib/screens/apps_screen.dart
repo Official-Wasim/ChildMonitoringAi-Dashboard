@@ -15,6 +15,18 @@ class AppsScreen extends StatefulWidget {
 }
 
 class _AppsScreenState extends State<AppsScreen> {
+  // Add color scheme constants to match other screens
+  static const Color primaryColor = Color(0xFF1A237E); // Deep Indigo
+  static const Color secondaryColor =
+      Color(0xFF283593); // Slightly lighter Indigo
+  static const Color accentColor = Color(0xFF3949AB); // Bright Indigo
+  static const Color backgroundColor =
+      Color(0xFFF8F9FF); // Light blue-tinted white
+  static const Color backgroundGradientStart = Color(0xFFFFFFFF); // Pure white
+  static const Color backgroundGradientEnd =
+      Color(0xFFF0F2FF); // Very light indigo
+  static const Color surfaceColor = Colors.white;
+
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   String _userId = "";
   String get _phoneModel => widget.phoneModel ?? "sdk_gphone64_x86_64";
@@ -97,6 +109,7 @@ class _AppsScreenState extends State<AppsScreen> {
             'status': appData['status'] ?? 'Unknown',
             'timestamp': appData['timestamp'] ?? 0,
             'version': appData['version'] ?? 'Unknown',
+            'category': appData['category'] ?? 'user_installed',
           };
         }).toList();
 
@@ -181,15 +194,22 @@ class _AppsScreenState extends State<AppsScreen> {
           elevation: 0,
           child: Container(
             width: 340,
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  Color(0xFFF5F6FF), // Very light indigo
+                ],
+              ),
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: primaryColor.withOpacity(0.15),
                   blurRadius: 20,
-                  offset: Offset(0, 10),
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
@@ -199,18 +219,18 @@ class _AppsScreenState extends State<AppsScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.filter_list,
                         color: Colors.blue,
                       ),
                     ),
-                    SizedBox(width: 12),
-                    Text(
+                    const SizedBox(width: 12),
+                    const Text(
                       "Filter Apps",
                       style: TextStyle(
                         fontSize: 20,
@@ -220,12 +240,12 @@ class _AppsScreenState extends State<AppsScreen> {
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 ...["all", "installed", "uninstalled"].map((filter) {
                   String title = filter[0].toUpperCase() + filter.substring(1);
                   if (filter == "all") title = "Show All";
                   return Padding(
-                    padding: EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
@@ -238,7 +258,7 @@ class _AppsScreenState extends State<AppsScreen> {
                           Navigator.pop(context);
                         },
                         child: Container(
-                          padding: EdgeInsets.symmetric(
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
                           ),
@@ -267,7 +287,7 @@ class _AppsScreenState extends State<AppsScreen> {
                                     : Colors.grey,
                                 size: 20,
                               ),
-                              SizedBox(width: 12),
+                              const SizedBox(width: 12),
                               Text(
                                 title,
                                 style: TextStyle(
@@ -279,9 +299,9 @@ class _AppsScreenState extends State<AppsScreen> {
                                       : FontWeight.normal,
                                 ),
                               ),
-                              Spacer(),
+                              const Spacer(),
                               if (_selectedFilter == filter)
-                                Icon(
+                                const Icon(
                                   Icons.check_circle,
                                   color: Colors.blue,
                                   size: 20,
@@ -293,17 +313,18 @@ class _AppsScreenState extends State<AppsScreen> {
                     ),
                   );
                 }).toList(),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   style: TextButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     backgroundColor: Colors.blue.withOpacity(0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Close',
                     style: TextStyle(
                       color: Colors.blue,
@@ -323,6 +344,11 @@ class _AppsScreenState extends State<AppsScreen> {
     if (timestamp == null || timestamp == 0) return "Invalid time";
     final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp).toLocal();
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(dateTime);
+  }
+
+  String _formatSize(num? sizeInBytes) {
+    if (sizeInBytes == null || sizeInBytes == 0) return "0 MB";
+    return "${(sizeInBytes / (1024 * 1024)).toStringAsFixed(2)} MB"; // Convert bytes to MB
   }
 
   @override
@@ -347,6 +373,45 @@ class _AppsScreenState extends State<AppsScreen> {
           .compareTo(DateFormat('dd MMM yyyy').parse(a.key))));
   }
 
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'installed':
+        return Colors.green;
+      case 'updated':
+        return Colors.amber;
+      case 'uninstalled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'installed':
+        return Icons.check_circle;
+      case 'updated':
+        return Icons.system_update;
+      case 'uninstalled':
+        return Icons.remove_circle;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  Color _getIconBackgroundColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'installed':
+        return Colors.green;
+      case 'updated':
+        return Colors.amber;
+      case 'uninstalled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
   Widget _buildAppsList() {
     final groupedApps = _groupAppsByDate(_paginatedApps);
     final theme = Theme.of(context);
@@ -363,13 +428,14 @@ class _AppsScreenState extends State<AppsScreen> {
               child: TextButton(
                 onPressed: _loadMoreData,
                 style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   backgroundColor: Colors.blue.withOpacity(0.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
+                child: const Text(
                   'Load More',
                   style: TextStyle(
                     color: Colors.blue,
@@ -394,18 +460,17 @@ class _AppsScreenState extends State<AppsScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.blue,
-                        Colors.blue.withOpacity(0.8),
-                      ],
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [primaryColor, secondaryColor],
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
+                        color: primaryColor.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -422,7 +487,7 @@ class _AppsScreenState extends State<AppsScreen> {
                 Text(
                   '${appsForDate.length} apps',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.blue,
+                    color: primaryColor,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -446,77 +511,110 @@ class _AppsScreenState extends State<AppsScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              app['status'] == 'installed'
-                                  ? Colors.green.withOpacity(0.3)
-                                  : Colors.red.withOpacity(0.3),
-                              app['status'] == 'installed'
-                                  ? Colors.green.withOpacity(0.1)
-                                  : Colors.red.withOpacity(0.1),
-                            ],
+                      Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _getIconBackgroundColor(app['status'])
+                                      .withOpacity(0.3),
+                                  _getIconBackgroundColor(app['status'])
+                                      .withOpacity(0.1),
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.apps,
+                              color: _getIconBackgroundColor(app['status']),
+                              size: 24,
+                            ),
                           ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.apps,
-                          color: app['status'] == 'installed'
-                              ? Colors.green
-                              : Colors.red,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              app['appName'] ?? 'Unknown App',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              app['packageName'] ?? 'Unknown Package',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withOpacity(0.7),
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  size: 14,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary
-                                      .withOpacity(0.7),
-                                ),
-                                const SizedBox(width: 4),
                                 Text(
-                                  'v${app['version']} • ${app['size']} KB',
+                                  app['appName'] ?? 'Unknown App',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  app['packageName'] ?? 'Unknown Package',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withOpacity(0.7),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _buildInfoChip(
+                            context,
+                            icon: Icons.system_update,
+                            label: app['category'] == 'system'
+                                ? 'System App'
+                                : 'User Installed',
+                            color: app['category'] == 'system'
+                                ? Colors.grey
+                                : Colors.blue,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildInfoChip(
+                            context,
+                            icon: _getStatusIcon(app['status']),
+                            label: app['status']?.toString().toUpperCase() ??
+                                'N/A',
+                            color: _getStatusColor(app['status']),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary
+                                    .withOpacity(0.7),
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'v${app['version']}',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
@@ -526,11 +624,64 @@ class _AppsScreenState extends State<AppsScreen> {
                                             .secondary
                                             .withOpacity(0.7),
                                       ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.sd_storage_outlined,
+                                size: 14,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary
+                                    .withOpacity(0.7),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatSize(app['size']),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary
+                                          .withOpacity(0.7),
+                                    ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 14,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .secondary
+                                    .withOpacity(0.7),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatTimestamp(app['timestamp']),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary
+                                          .withOpacity(0.7),
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -543,17 +694,51 @@ class _AppsScreenState extends State<AppsScreen> {
     );
   }
 
+  Widget _buildInfoChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight + 60), // Changed from 160
+        preferredSize: const Size.fromHeight(kToolbarHeight + 60),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.only(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryColor, secondaryColor],
+            ),
+            borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(40),
               bottomRight: Radius.circular(40),
             ),
@@ -561,7 +746,7 @@ class _AppsScreenState extends State<AppsScreen> {
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
                 blurRadius: 8,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -569,7 +754,7 @@ class _AppsScreenState extends State<AppsScreen> {
             elevation: 0,
             backgroundColor: Colors.transparent,
             leading: IconButton(
-              icon: Icon(
+              icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: Colors.white,
                 size: 22,
@@ -585,7 +770,7 @@ class _AppsScreenState extends State<AppsScreen> {
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(80), // Changed from 100
+              preferredSize: const Size.fromHeight(80), // Changed from 100
               child: Container(
                 padding: const EdgeInsets.only(
                   left: 16,
@@ -604,7 +789,7 @@ class _AppsScreenState extends State<AppsScreen> {
                             BoxShadow(
                               color: Colors.black.withOpacity(0.1),
                               blurRadius: 4,
-                              offset: Offset(0, 2),
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
@@ -616,9 +801,10 @@ class _AppsScreenState extends State<AppsScreen> {
                             hintStyle: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade600,
                             ),
-                            prefixIcon: Icon(Icons.search, color: Colors.blue),
+                            prefixIcon:
+                                const Icon(Icons.search, color: Colors.blue),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
+                            contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                           ),
                         ),
@@ -631,7 +817,8 @@ class _AppsScreenState extends State<AppsScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
-                        icon: Icon(Icons.filter_list, color: Colors.white),
+                        icon:
+                            const Icon(Icons.filter_list, color: Colors.white),
                         onPressed: _showFilterDialog,
                         tooltip: "Filter Apps",
                       ),
@@ -644,23 +831,24 @@ class _AppsScreenState extends State<AppsScreen> {
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Colors.blue.withOpacity(0.1),
-              Theme.of(context).colorScheme.background,
+              Color(0xFFE8EAF6), // Light Indigo 50
+              Color(0xFFC5CAE9), // Indigo 100
+              Color(0xFFE8EAF6), // Light Indigo 50
             ],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
           // Wrap with SafeArea
           child: Column(
             children: [
-              const SizedBox(height: 16),
               _isLoading
-                  ? Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : _filteredApps.isEmpty
                       ? Center(
                           child: Text(
@@ -679,8 +867,8 @@ class _AppsScreenState extends State<AppsScreen> {
                                       .textTheme
                                       .bodyMedium
                                       ?.copyWith(
-                                        color: Colors.blue,
-                                        fontWeight: FontWeight.w500,
+                                        color: primaryColor,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                 ),
                               ),
