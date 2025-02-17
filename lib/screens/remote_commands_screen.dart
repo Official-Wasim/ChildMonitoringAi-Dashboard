@@ -328,7 +328,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
             blurRadius: 4,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -343,8 +343,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
               style: TextStyle(color: Colors.grey.shade600),
             ),
           ),
-          icon: Padding(
-            padding: const EdgeInsets.only(right: 16),
+          icon: const Padding(
+            padding: EdgeInsets.only(right: 16),
             child: Icon(Icons.phone_android, color: Colors.blue),
           ),
           style: Theme.of(context).textTheme.bodyMedium,
@@ -542,34 +542,74 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
           child: TextField(
             controller: phoneController,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(hintText: 'Enter phone number'),
+            decoration: const InputDecoration(
+                hintText: 'Enter phone number (optional)'),
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            _buildModernButton(
-              onPressed: () => _sendCommand('recover_sms', {
-                'phone_number': phoneController.text.trim().isEmpty
-                    ? 'unknown'
-                    : phoneController.text.trim(),
-                'data_count': _selectedDataCount,
-              }),
-              label: 'Recover SMS',
-              icon: Icons.sms,
-            ),
-            const SizedBox(width: 16),
-            _buildModernButton(
-              onPressed: () => _sendCommand('recover_calls', {
-                'phone_number': phoneController.text.trim().isEmpty
-                    ? 'unknown'
-                    : phoneController.text.trim(),
-                'data_count': _selectedDataCount,
-              }),
-              label: 'Recover Calls',
-              icon: Icons.call,
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 400) {
+              // For smaller screens, stack buttons vertically
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildModernButton(
+                    onPressed: () => _sendCommand('recover_sms', {
+                      'phone_number': phoneController.text.trim().isEmpty
+                          ? 'unknown'
+                          : phoneController.text.trim(),
+                      'data_count': _selectedDataCount,
+                    }),
+                    label: 'Recover SMS',
+                    icon: Icons.sms,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildModernButton(
+                    onPressed: () => _sendCommand('recover_calls', {
+                      'phone_number': phoneController.text.trim().isEmpty
+                          ? 'unknown'
+                          : phoneController.text.trim(),
+                      'data_count': _selectedDataCount,
+                    }),
+                    label: 'Recover Calls',
+                    icon: Icons.call,
+                  ),
+                ],
+              );
+            } else {
+              // For wider screens, place buttons in a row with Expanded
+              return Row(
+                children: [
+                  Expanded(
+                    child: _buildModernButton(
+                      onPressed: () => _sendCommand('recover_sms', {
+                        'phone_number': phoneController.text.trim().isEmpty
+                            ? 'unknown'
+                            : phoneController.text.trim(),
+                        'data_count': _selectedDataCount,
+                      }),
+                      label: 'Recover SMS',
+                      icon: Icons.sms,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildModernButton(
+                      onPressed: () => _sendCommand('recover_calls', {
+                        'phone_number': phoneController.text.trim().isEmpty
+                            ? 'unknown'
+                            : phoneController.text.trim(),
+                        'data_count': _selectedDataCount,
+                      }),
+                      label: 'Recover Calls',
+                      icon: Icons.call,
+                    ),
+                  ),
+                ],
+              );
+            }
+          },
         ),
       ],
     );
@@ -615,58 +655,58 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
     );
   }
 
-  Widget _buildSendSmsSection() {
-    final TextEditingController phoneController = TextEditingController();
+  Widget _buildSendMessageSection() {
+    final TextEditingController titleController = TextEditingController();
     final TextEditingController messageController = TextEditingController();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Send SMS',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Warning: The SMS will be visible in the SMS app.',
+          'Note: The message will be visible on the Screen.',
           style: TextStyle(
             color: Colors.red,
             fontSize: 14,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 16),
         _buildModernTextField(
-          label: 'Phone Number',
-          controller: phoneController,
-          keyboardType: TextInputType.phone,
-          hintText: 'Enter phone number',
+          label: 'Title (max 200 characters)',
+          controller: titleController,
+          keyboardType: TextInputType.text,
+          hintText: 'Enter message title',
         ),
         const SizedBox(height: 16),
         _buildModernTextField(
           label: 'Message',
           controller: messageController,
           keyboardType: TextInputType.text,
-          hintText: 'Enter message',
+          hintText: 'Enter message content',
         ),
         const SizedBox(height: 16),
         _buildModernButton(
           onPressed: () {
-            if (phoneController.text.trim().isEmpty ||
+            if (titleController.text.trim().isEmpty ||
                 messageController.text.trim().isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Both fields are required.')),
               );
               return;
             }
-            _sendCommand('send_sms', {
-              'phone_number': phoneController.text.trim(),
+            if (titleController.text.length > 200) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Title must be 200 characters or less.')),
+              );
+              return;
+            }
+            _sendCommand('send_message', {
+              'title': titleController.text.trim(),
               'message': messageController.text.trim(),
             });
           },
-          label: 'Send SMS',
+          label: 'Send Message',
           icon: Icons.send,
         ),
       ],
@@ -733,7 +773,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
       }
       return 'Address not available';
     } catch (e) {
-      print('Error getting address: $e');
       return 'Error fetching address';
     }
   }
@@ -867,21 +906,36 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                                 context: context,
                                 builder: (context) => Dialog(
                                   child: Container(
+                                    constraints: BoxConstraints(
+                                      maxHeight:
+                                          MediaQuery.of(context).size.height *
+                                              0.8,
+                                      maxWidth:
+                                          MediaQuery.of(context).size.width *
+                                              0.8,
+                                    ),
                                     padding: const EdgeInsets.all(16),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          child: Image.network(
-                                            commandResult,
-                                            loadingBuilder: (context, child,
-                                                loadingProgress) {
-                                              if (loadingProgress == null)
-                                                return child;
-                                              return const CircularProgressIndicator();
-                                            },
+                                        Flexible(
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            child: RotatedBox(
+                                              quarterTurns:
+                                                  1, // Rotate 90 degrees to portrait
+                                              child: Image.network(
+                                                commandResult,
+                                                fit: BoxFit.contain,
+                                                loadingBuilder: (context, child,
+                                                    loadingProgress) {
+                                                  if (loadingProgress == null)
+                                                    return child;
+                                                  return const CircularProgressIndicator();
+                                                },
+                                              ),
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(height: 16),
@@ -930,7 +984,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.location_on,
+                                      const Icon(Icons.location_on,
                                           size: 16, color: Colors.red),
                                       const SizedBox(width: 8),
                                       Expanded(
@@ -947,7 +1001,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                                   const Divider(height: 16),
                                   Row(
                                     children: [
-                                      Icon(Icons.map,
+                                      const Icon(Icons.map,
                                           size: 16, color: Colors.blue),
                                       const SizedBox(width: 8),
                                       Expanded(
@@ -955,7 +1009,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                                                 ConnectionState.waiting
                                             ? Row(
                                                 children: [
-                                                  SizedBox(
+                                                  const SizedBox(
                                                     width: 12,
                                                     height: 12,
                                                     child:
@@ -1053,7 +1107,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
         return Icons.call;
       case 'retrieve_contacts':
         return Icons.contacts;
-      case 'send_sms':
+      case 'send_message':
         return Icons.message;
       case 'vibrate':
         return Icons.vibration;
@@ -1077,7 +1131,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
         return Colors.orange;
       case 'retrieve_contacts':
         return Colors.blue;
-      case 'send_sms':
+      case 'send_message':
         return Colors.teal;
       case 'vibrate':
         return Colors.pink;
@@ -1119,7 +1173,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
           elevation: 0,
           backgroundColor: AppTheme.primaryColor,
           leading: IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.arrow_back_ios_new_rounded,
               color: Colors.white,
               size: 22,
@@ -1129,7 +1183,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
               MaterialPageRoute(builder: (context) => DashboardScreen()),
             ),
           ),
-          title: Text(
+          title: const Text(
             "Remote Control",
             style: AppTheme.headlineStyle,
           ),
@@ -1139,7 +1193,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
             ),
           ),
           bottom: PreferredSize(
-            preferredSize: Size.fromHeight(60), // Adjusted height
+            preferredSize: const Size.fromHeight(60), // Adjusted height
             child: Padding(
               padding: const EdgeInsets.only(
                 left: 16,
@@ -1200,20 +1254,20 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                         fontWeight: FontWeight.w500,
                       ),
                       tabs: [
-                        Tab(
+                        const Tab(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
+                            children: [
                               Icon(Icons.touch_app),
                               SizedBox(width: 8),
                               Text('Actions'),
                             ],
                           ),
                         ),
-                        Tab(
+                        const Tab(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
+                            children: [
                               Icon(Icons.history),
                               SizedBox(width: 8),
                               Text('Results'),
@@ -1283,11 +1337,11 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
                               child: _buildRetrieveContactsSection(),
                             ),
                             _buildFeatureCard(
-                              title: 'Send SMS',
-                              subtitle: 'Send SMS to a phone number',
+                              title: 'Send Message',
+                              subtitle: 'Send a message to the device',
                               icon: Icons.message,
                               iconColor: Colors.teal,
-                              child: _buildSendSmsSection(),
+                              child: _buildSendMessageSection(),
                             ),
                             _buildFeatureCard(
                               title: 'Vibrate the Phone',
@@ -1313,23 +1367,23 @@ class _RemoteControlScreenState extends State<RemoteControlScreen>
           key: _bottomNavigationKey,
           index: _page,
           items: [
-            CurvedNavigationBarItem(
+            const CurvedNavigationBarItem(
               child: Icon(Icons.home_outlined),
               label: 'Home',
             ),
-            CurvedNavigationBarItem(
+            const CurvedNavigationBarItem(
               child: Icon(Icons.history),
               label: 'Recent',
             ),
-            CurvedNavigationBarItem(
+            const CurvedNavigationBarItem(
               child: Icon(Icons.phone_android_outlined),
               label: 'Remote',
             ),
-            CurvedNavigationBarItem(
+            const CurvedNavigationBarItem(
               child: Icon(Icons.bar_chart),
               label: 'Stats',
             ),
-            CurvedNavigationBarItem(
+            const CurvedNavigationBarItem(
               child: Icon(Icons.settings),
               label: 'Settings',
             ),
